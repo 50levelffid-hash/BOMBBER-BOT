@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: otp-bomber-bot
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: BOT_TOKEN
+        value: 8245282965:AAHv7gqhFowAzeA5OW1GKZYAEb_bYhklYaQ
+      - key: ADMIN_IDS
+        value: 6346250222
+      - key: MONGODB_URI
+        value: mongodb+srv://sahajada07:Sahajada123@cluster0.vynn0ht.mongodb.net/?appName=Cluster0
+      - key: DB_NAME
+        value: otp_bomber_bot
+      - key: PORT
+        value: 3000
