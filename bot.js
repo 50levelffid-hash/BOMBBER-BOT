@@ -13,7 +13,7 @@ const bombingStatus = new Map(); // chatId -> true/false
 const userStates = new Map();     // chatId -> { state, data }
 const pendingPayments = new Map(); // userId -> { credits, userMsgId, adminMsgId }
 
-/ ---------- FULL API CONFIGURATION (copy from original Python) ----------
+// ---------- FULL API CONFIGURATION (copy from original Python) ----------
 const API_CONFIGS = [
     {
       "name": "Hotstar_1",
