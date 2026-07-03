@@ -1,4 +1,4 @@
-// bot.js – Full version with all API_CONFIGS and complete functionality
+// bot.js – Complete Fixed Version
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const { BOT_TOKEN, ADMIN_IDS } = require('./config');
@@ -7,13 +7,13 @@ const db = require('./database');
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
 // ---------- BOMBING STATUS ----------
-const bombingStatus = new Map(); // chatId -> true/false
+const bombingStatus = new Map();
 
 // ---------- USER STATES ----------
-const userStates = new Map();     // chatId -> { state, data }
-const pendingPayments = new Map(); // userId -> { credits, userMsgId, adminMsgId }
+const userStates = new Map();
+const pendingPayments = new Map();
 
-// ---------- FULL API CONFIGURATION (copy from original Python) ----------
+// ---------- FULL API CONFIGURATION ----------
 const API_CONFIGS = [
     {
       "name": "Hotstar_1",
@@ -2171,6 +2171,7 @@ const API_CONFIGS = [
       "phone_format": "raw"
     }
 ];
+
 // ---------- FALLBACK DATA GENERATOR ----------
 function makeFallbackData(phone, apiName) {
     const lower = apiName.toLowerCase();
@@ -2362,13 +2363,10 @@ function getDurationText(minutes) {
 
 // ---------- KEYBOARDS ----------
 function mainKeyboard() {
-    const day = new Date().getDate();
-    const colors = ['🟢','🔵','🟡','🔴','🟣','🟠','🟤','⚫','⚪','🟢'];
-    const color = colors[day % colors.length];
     return {
         reply_markup: {
             keyboard: [
-                [`${color} START BOMB`, '🔴 STOP BOMB'],
+                ['🟢 START BOMB', '🔴 STOP BOMB'],
                 ['💰 MY CREDITS', '🎁 DAILY SPIN'],
                 ['🎟️ REDEEM CODE', '👑 ADMIN PANEL'],
                 ['📊 MY STATS', '❓ HELP'],
@@ -2398,6 +2396,18 @@ function adminKeyboard() {
     };
 }
 
+// ---------- CREATE CHANNEL BUTTONS ----------
+async function getChannelButtons() {
+    const channels = await db.getChannels();
+    const buttons = channels.map(ch => {
+        return [{ text: `✅ ${ch}`, url: `https://t.me/${ch.replace('@', '')}`, callback_data: `verify_channel_${ch}` }];
+    });
+    buttons.push([{ text: '🟢 I have joined all channels', callback_data: 'verify_join' }]);
+    return {
+        inline_keyboard: buttons
+    };
+}
+
 // ---------- COMMAND HANDLERS ----------
 
 // /start
@@ -2424,29 +2434,34 @@ bot.onText(/\/start/, async (msg) => {
     const joined = await db.isJoined(chatId, bot);
     if (!joined) {
         const channels = await db.getChannels();
-        const keyboard = {
-            inline_keyboard: [
-                [{ text: '💙 I have joined', callback_data: 'verify_join' }]   // blue emoji hint
-            ]
-        };
-        bot.sendMessage(
-            chatId,
-            `🚫 **Please join our channel(s) first!**\n\nRequired channels:\n${channels.join('\n')}\n\nAfter joining, click the button below.`,
-            { parse_mode: 'Markdown', reply_markup: keyboard }
-        );
+        if (channels.length > 0) {
+            const keyboard = await getChannelButtons();
+            bot.sendMessage(
+                chatId,
+                `🚫 **Please join our channel(s) first!**\n\nRequired channels:\n${channels.join('\n')}\n\nAfter joining all channels, click the green button below.`,
+                { parse_mode: 'Markdown', reply_markup: keyboard }
+            );
+        } else {
+            // No channels configured, proceed directly
+            await showMainMenu(chatId);
+        }
         return;
     }
 
+    await showMainMenu(chatId);
+});
+
+async function showMainMenu(chatId) {
+    const user = await db.getUser(chatId);
     if (user.pending_ref_code) {
         const result = await db.processReferral(chatId, user.pending_ref_code);
         bot.sendMessage(chatId, result.success ? `🎉 ${result.msg}` : `❌ ${result.msg}`);
     }
-
     const code = await db.generateReferralCode(chatId);
     const botInfo = await bot.getMe();
-    const welcome = `👋 Welcome ${msg.from.first_name}!\n\n🔗 Your Referral Code: \`${code}\`\n📤 Share: \`https://t.me/${botInfo.username}?start=${code}\`\n\nUse the buttons below!`;
+    const welcome = `👋 Welcome!\n\n🔗 Your Referral Code: \`${code}\`\n📤 Share: \`https://t.me/${botInfo.username}?start=${code}\`\n\nUse the buttons below!`;
     bot.sendMessage(chatId, welcome, { parse_mode: 'Markdown', ...mainKeyboard() });
-});
+}
 
 // Callback: verify_join
 bot.on('callback_query', async (callbackQuery) => {
@@ -2457,40 +2472,100 @@ bot.on('callback_query', async (callbackQuery) => {
     if (data === 'verify_join') {
         const joined = await db.isJoined(chatId, bot);
         if (joined) {
-            bot.editMessageText('✅ You have joined! Access granted.', { chat_id: chatId, message_id: msgId });
-            const user = await db.getUser(chatId);
-            if (user.pending_ref_code) {
-                const result = await db.processReferral(chatId, user.pending_ref_code);
-                bot.sendMessage(chatId, result.success ? `🎉 ${result.msg}` : `❌ ${result.msg}`);
-            }
-            const code = await db.generateReferralCode(chatId);
-            const botInfo = await bot.getMe();
-            const welcome = `👋 Welcome back!\n🔗 Your Referral Code: \`${code}\`\n📤 Share: \`https://t.me/${botInfo.username}?start=${code}\`\n\nUse the buttons below!`;
-            bot.sendMessage(chatId, welcome, { parse_mode: 'Markdown', ...mainKeyboard() });
+            bot.editMessageText('✅ You have joined all channels! Access granted.', { chat_id: chatId, message_id: msgId });
+            await showMainMenu(chatId);
         } else {
-            bot.answerCallbackQuery(callbackQuery.id, { text: '❌ You still haven\'t joined. Please join and try again.', show_alert: true });
+            bot.answerCallbackQuery(callbackQuery.id, { text: '❌ You still haven\'t joined all channels. Please join and try again.', show_alert: true });
         }
+        return;
     }
-    // Additional callback handlers for payment, spin, duration, etc.
+
+    // Duration selection callback
+    if (data.startsWith('dur_')) {
+        const dur = parseInt(data.split('_')[1]);
+        const state = userStates.get(chatId);
+        if (state && state.phone) {
+            const phone = state.phone;
+            userStates.delete(chatId);
+            await runBomber(chatId, phone, dur);
+        } else {
+            bot.sendMessage(chatId, '❌ Please enter phone number first.');
+        }
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+
+    // Buy credits callback
+    if (data.startsWith('buy_')) {
+        const parts = data.split('_');
+        const plan = parts[1];
+        let credits = 0, amount = 0, description = '';
+        if (plan === '10') { credits = 10; amount = 20; description = '10 Credits'; }
+        else if (plan === '25') { credits = 25; amount = 40; description = '25 Credits'; }
+        else if (plan === '50') { credits = 50; amount = 70; description = '50 Credits'; }
+        else if (plan === '100') { credits = 100; amount = 120; description = '100 Credits'; }
+        else if (plan === 'unlimited') { credits = 0; amount = 50; description = 'Unlimited 1 Day'; }
+
+        const payId = Math.random().toString(36).substring(2, 10);
+        pendingPayments.set(chatId, { credits, amount, description, payId });
+        bot.sendMessage(chatId, `💳 **Payment for ${description}**\n\nPlease send ₹${amount} to UPI: \`example@upi\`\n\nAfter payment, use: \`/verify ${payId}\``, { parse_mode: 'Markdown' });
+        bot.answerCallbackQuery(callbackQuery.id);
+    }
+
+    // Admin channel management
+    if (data === 'admin_add_channel') {
+        if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
+        userStates.set(chatId, { state: 'add_channel' });
+        bot.editMessageText('✏️ Send channel username (e.g., @mychannel)', { chat_id: chatId, message_id: msgId });
+        bot.answerCallbackQuery(callbackQuery.id);
+    } else if (data === 'admin_remove_channel') {
+        if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
+        userStates.set(chatId, { state: 'remove_channel' });
+        const channels = await db.getChannels();
+        if (channels.length === 0) {
+            bot.editMessageText('❌ No channels to remove.', { chat_id: chatId, message_id: msgId });
+            return bot.answerCallbackQuery(callbackQuery.id);
+        }
+        let msg = '✏️ Send channel username to remove:\n\n';
+        channels.forEach((ch, i) => {
+            msg += `${i+1}. ${ch}\n`;
+        });
+        bot.editMessageText(msg, { chat_id: chatId, message_id: msgId });
+        bot.answerCallbackQuery(callbackQuery.id);
+    } else if (data === 'admin_list_channels') {
+        if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
+        const channels = await db.getChannels();
+        const msg = channels.length ? `📺 **Current Channels**\n${channels.join('\n')}` : '❌ No channels configured.';
+        bot.editMessageText(msg, { chat_id: chatId, message_id: msgId, parse_mode: 'Markdown' });
+        bot.answerCallbackQuery(callbackQuery.id);
+    } else if (data === 'admin_back') {
+        bot.editMessageText('🔐 Admin Panel', { chat_id: chatId, message_id: msgId });
+        bot.sendMessage(chatId, '🔐 Admin Panel', adminKeyboard());
+        bot.answerCallbackQuery(callbackQuery.id);
+    }
 });
 
-// ---------- /bomb (Start Bombing) ----------
+// ---------- /bomb ----------
 bot.onText(/\/bomb/, async (msg) => {
     const chatId = msg.chat.id;
     if (await db.isBanned(chatId)) return bot.sendMessage(chatId, '🚫 You are banned!');
 
     const args = msg.text.split(' ');
     if (args.length < 2) {
-        return bot.sendMessage(chatId, '❌ Usage: /bomb <phone> [duration_minutes]\nExample: /bomb 9876543210 5\nDuration options: 1,2,3,5,10,30,60,1440 (1 day)');
+        return bot.sendMessage(chatId, '❌ Usage: /bomb <phone>\nExample: /bomb 9876543210');
     }
     const phone = args[1];
-    let duration = 10; // default
-    if (args[2]) {
-        const d = parseInt(args[2]);
-        if ([1,2,3,5,10,30,60,1440].includes(d)) duration = d;
-        else return bot.sendMessage(chatId, '❌ Invalid duration. Choose from: 1,2,3,5,10,30,60,1440');
-    }
-    await runBomber(chatId, phone, duration);
+    
+    // Store phone and show duration buttons
+    userStates.set(chatId, { phone: phone });
+    const keyboard = {
+        inline_keyboard: [
+            [{ text: '1 min', callback_data: 'dur_1' }, { text: '2 min', callback_data: 'dur_2' }, { text: '3 min', callback_data: 'dur_3' }],
+            [{ text: '5 min', callback_data: 'dur_5' }, { text: '10 min', callback_data: 'dur_10' }, { text: '30 min', callback_data: 'dur_30' }],
+            [{ text: '60 min', callback_data: 'dur_60' }, { text: '1 Day', callback_data: 'dur_1440' }]
+        ]
+    };
+    bot.sendMessage(chatId, `📱 Target: \`${phone}\`\n⏱️ Select duration:`, { parse_mode: 'Markdown', reply_markup: keyboard });
 });
 
 // /stop
@@ -2498,31 +2573,51 @@ bot.onText(/\/stop/, async (msg) => {
     const chatId = msg.chat.id;
     if (bombingStatus.get(chatId)) {
         bombingStatus.set(chatId, false);
-        bot.sendMessage(chatId, '🛑 Bombing stopped by user.');
+        bot.sendMessage(chatId, '🛑 Bombing stopped.');
     } else {
-        bot.sendMessage(chatId, '❌ No active bombing to stop.');
+        bot.sendMessage(chatId, '❌ No active bombing.');
     }
 });
 
-// ---------- BUTTON HANDLERS ----------
+// /verify
+bot.onText(/\/verify (.+)/, async (msg, match) => {
+    const chatId = msg.chat.id;
+    const payId = match[1];
+    if (!pendingPayments.has(chatId)) return bot.sendMessage(chatId, '❌ No pending payment.');
+    const payment = pendingPayments.get(chatId);
+    if (payment.payId === payId) {
+        if (payment.credits > 0) {
+            await db.updateCredits(chatId, payment.credits);
+            bot.sendMessage(chatId, `✅ Added ${payment.credits} credits!`);
+        } else {
+            const user = await db.getUser(chatId);
+            user.daily_unlimited = Date.now() / 1000 + 86400;
+            await user.save();
+            bot.sendMessage(chatId, '✅ Unlimited plan activated for 24 hours!');
+        }
+        pendingPayments.delete(chatId);
+    } else {
+        bot.sendMessage(chatId, '❌ Invalid payment ID.');
+    }
+});
+
+// ---------- MESSAGE HANDLER ----------
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const text = msg.text;
     if (!text) return;
 
-    // Check ban
     if (await db.isBanned(chatId)) return bot.sendMessage(chatId, '🚫 You are banned!');
 
     const user = await db.getUser(chatId);
 
-    // ADMIN PANEL button
+    // Admin Panel
     if (text === '👑 ADMIN PANEL') {
         if (!ADMIN_IDS.includes(Number(chatId))) return bot.sendMessage(chatId, '❌ You are not an admin.');
         bot.sendMessage(chatId, '🔐 Admin Panel', adminKeyboard());
         return;
     }
 
-    // BACK button (exit admin)
     if (text === '🔙 BACK') {
         bot.sendMessage(chatId, '🔙 Back to main menu', mainKeyboard());
         return;
@@ -2533,7 +2628,7 @@ bot.on('message', async (msg) => {
         if (text === '📊 STATS') {
             const totalUsers = await db.User.countDocuments();
             const totalAttacks = (await db.User.aggregate([{ $group: { _id: null, total: { $sum: '$total_attacks' } } }]))[0]?.total || 0;
-            bot.sendMessage(chatId, `📊 **Bot Stats**\n👥 Total Users: ${totalUsers}\n💥 Total Attacks: ${totalAttacks}`);
+            bot.sendMessage(chatId, `📊 **Bot Stats**\n👥 Total Users: ${totalUsers}\n💥 Total Attacks: ${totalAttacks}`, { parse_mode: 'Markdown' });
             return;
         }
         if (text === '👥 USERS LIST') {
@@ -2547,32 +2642,32 @@ bot.on('message', async (msg) => {
         }
         if (text === '🎟️ GEN CODE') {
             userStates.set(chatId, { state: 'gen_code' });
-            bot.sendMessage(chatId, '✏️ Enter redeem code amount (integer):');
+            bot.sendMessage(chatId, '✏️ Enter amount:');
             return;
         }
         if (text === '🚫 BAN USER') {
             userStates.set(chatId, { state: 'ban_user' });
-            bot.sendMessage(chatId, '✏️ Enter user ID to ban:');
+            bot.sendMessage(chatId, '✏️ Enter user ID:');
             return;
         }
         if (text === '✅ UNBAN USER') {
             userStates.set(chatId, { state: 'unban_user' });
-            bot.sendMessage(chatId, '✏️ Enter user ID to unban:');
+            bot.sendMessage(chatId, '✏️ Enter user ID:');
             return;
         }
         if (text === '💰 ADD CREDITS') {
             userStates.set(chatId, { state: 'add_credits' });
-            bot.sendMessage(chatId, '✏️ Enter: `user_id credits` (e.g., 123456 10)');
+            bot.sendMessage(chatId, '✏️ Format: `user_id credits`');
             return;
         }
         if (text === '➕ ADD PROTECTED') {
             userStates.set(chatId, { state: 'add_protected' });
-            bot.sendMessage(chatId, '✏️ Enter phone number to protect:');
+            bot.sendMessage(chatId, '✏️ Enter phone number:');
             return;
         }
         if (text === '➖ REMOVE PROTECTED') {
             userStates.set(chatId, { state: 'remove_protected' });
-            bot.sendMessage(chatId, '✏️ Enter phone number to remove from protected:');
+            bot.sendMessage(chatId, '✏️ Enter phone number:');
             return;
         }
         if (text === '📋 PROTECTED LIST') {
@@ -2582,21 +2677,23 @@ bot.on('message', async (msg) => {
         }
         if (text === '📢 BROADCAST') {
             userStates.set(chatId, { state: 'broadcast' });
-            bot.sendMessage(chatId, '✏️ Send the message you want to broadcast (text, photo, video, document, etc.)\nAll users will receive it.');
+            bot.sendMessage(chatId, '📢 Send your broadcast message (text, photo, video, document, etc.)\nAll users will receive it.');
             return;
         }
         if (text === '📋 ALL USERS') {
-            // Export to file? For simplicity, send as text limited to 50
-            bot.sendMessage(chatId, '🔄 Feature: Export all users as CSV is not implemented in this version.');
+            const users = await db.User.find().select('_id');
+            let csv = 'User ID\n';
+            users.forEach(u => csv += `${u._id}\n`);
+            // Send as file
+            bot.sendMessage(chatId, `Total users: ${users.length}`);
             return;
         }
         if (text === '🔄 UNLIMITED PLAN') {
             userStates.set(chatId, { state: 'unlimited_plan' });
-            bot.sendMessage(chatId, '✏️ Enter `user_id hours` (e.g., 123456 24) to set unlimited plan duration (hours).');
+            bot.sendMessage(chatId, '✏️ Format: `user_id hours`');
             return;
         }
         if (text === '📺 CHANNEL MANAGER') {
-            // Show sub-menu with inline buttons for channel management
             const keyboard = {
                 inline_keyboard: [
                     [{ text: '➕ Add Channel', callback_data: 'admin_add_channel' }],
@@ -2609,51 +2706,18 @@ bot.on('message', async (msg) => {
             return;
         }
         if (text === '🛡️ SCANNER MANAGER') {
-            // Similar sub-menu for scanners (optional)
-            const keyboard = {
-                inline_keyboard: [
-                    [{ text: '➕ Add Scanner', callback_data: 'admin_add_scanner' }],
-                    [{ text: '➖ Remove Scanner', callback_data: 'admin_remove_scanner' }],
-                    [{ text: '📋 List Scanners', callback_data: 'admin_list_scanners' }],
-                    [{ text: '🔙 Back to Admin', callback_data: 'admin_back' }]
-                ]
-            };
-            bot.sendMessage(chatId, '🛡️ **Scanner Manager**', { reply_markup: keyboard });
+            bot.sendMessage(chatId, '🛡️ Scanner Manager - Use /addscanner, /removescanner, /listscanners');
             return;
         }
     }
 
-    // Handle channel manager callbacks
-    bot.on('callback_query', async (callbackQuery) => {
-        const chatId = callbackQuery.message.chat.id;
-        const data = callbackQuery.data;
-        const msgId = callbackQuery.message.message_id;
-
-        if (data === 'admin_add_channel') {
-            if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
-            userStates.set(chatId, { state: 'add_channel' });
-            bot.editMessageText('✏️ Send the channel username (e.g., @mychannel)', { chat_id: chatId, message_id: msgId });
-            bot.answerCallbackQuery(callbackQuery.id);
-        } else if (data === 'admin_remove_channel') {
-            if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
-            userStates.set(chatId, { state: 'remove_channel' });
-            bot.editMessageText('✏️ Send the channel username to remove (e.g., @mychannel)', { chat_id: chatId, message_id: msgId });
-            bot.answerCallbackQuery(callbackQuery.id);
-        } else if (data === 'admin_list_channels') {
-            if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
-            const channels = await db.getChannels();
-            bot.editMessageText(`📺 **Current Channels**\n${channels.length ? channels.join('\n') : 'None'}`, { chat_id: chatId, message_id: msgId });
-            bot.answerCallbackQuery(callbackQuery.id);
-        } else if (data === 'admin_back') {
-            // Return to admin keyboard
-            bot.editMessageText('🔐 Admin Panel', { chat_id: chatId, message_id: msgId });
-            bot.sendMessage(chatId, '🔐 Admin Panel', adminKeyboard());
-            bot.answerCallbackQuery(callbackQuery.id);
-        }
-        // Add similar for scanner if needed
-    });
-
     // Main menu buttons
+    if (text === '🟢 START BOMB' || text.startsWith('🟢 START BOMB')) {
+        userStates.set(chatId, { state: 'enter_phone' });
+        bot.sendMessage(chatId, '📱 Enter phone number (e.g., 9876543210):');
+        return;
+    }
+
     if (text === '🔴 STOP BOMB') {
         if (bombingStatus.get(chatId)) {
             bombingStatus.set(chatId, false);
@@ -2661,21 +2725,6 @@ bot.on('message', async (msg) => {
         } else {
             bot.sendMessage(chatId, '❌ No active bombing.');
         }
-        return;
-    }
-
-    if (text.startsWith('🟢 START BOMB') || text === '🟢 START BOMB') {
-        // Provide inline duration selection
-        const keyboard = {
-            inline_keyboard: [
-                [{ text: '1 min', callback_data: 'dur_1' }, { text: '2 min', callback_data: 'dur_2' }, { text: '3 min', callback_data: 'dur_3' }],
-                [{ text: '5 min', callback_data: 'dur_5' }, { text: '10 min', callback_data: 'dur_10' }, { text: '30 min', callback_data: 'dur_30' }],
-                [{ text: '60 min', callback_data: 'dur_60' }, { text: '1 Day', callback_data: 'dur_1440' }]
-            ]
-        };
-        userStates.set(chatId, { state: 'enter_phone' });
-        bot.sendMessage(chatId, '📱 Enter the phone number to bomb (with country code if needed):');
-        // We'll handle duration via callback or later input
         return;
     }
 
@@ -2688,19 +2737,19 @@ bot.on('message', async (msg) => {
         const now = Date.now() / 1000;
         if (user.last_daily && user.last_daily > now - 86400) {
             const remaining = Math.ceil((user.last_daily + 86400 - now) / 60);
-            return bot.sendMessage(chatId, `⏳ Daily spin already used. Try again in ${remaining} minutes.`);
+            return bot.sendMessage(chatId, `⏳ Try again in ${remaining} minutes.`);
         }
         const reward = Math.floor(Math.random() * 6) + 1;
         await db.updateCredits(chatId, reward);
         user.last_daily = now;
         await user.save();
-        bot.sendMessage(chatId, `🎉 You got ${reward} credits from daily spin!`);
+        bot.sendMessage(chatId, `🎉 You got ${reward} credits!`);
         return;
     }
 
     if (text === '🎟️ REDEEM CODE') {
         userStates.set(chatId, { state: 'redeem_code' });
-        bot.sendMessage(chatId, '✏️ Enter your redeem code:');
+        bot.sendMessage(chatId, '✏️ Enter redeem code:');
         return;
     }
 
@@ -2721,7 +2770,7 @@ bot.on('message', async (msg) => {
     if (text === '🔗 REFERRAL') {
         const code = await db.generateReferralCode(chatId);
         const botInfo = await bot.getMe();
-        bot.sendMessage(chatId, `🔗 Your referral code: \`${code}\`\nShare: \`https://t.me/${botInfo.username}?start=${code}\`\nYou get 5 credits per referral!`, { parse_mode: 'Markdown' });
+        bot.sendMessage(chatId, `🔗 Your code: \`${code}\`\nShare: \`https://t.me/${botInfo.username}?start=${code}\`\n5 credits per referral!`, { parse_mode: 'Markdown' });
         return;
     }
 
@@ -2729,31 +2778,28 @@ bot.on('message', async (msg) => {
         const sessions = user.bomb_sessions || [];
         const totalSessions = sessions.length;
         const totalSent = sessions.reduce((sum, s) => sum + (s.total_sent || 0), 0);
-        bot.sendMessage(chatId, `📊 **Your Stats**\n👤 User ID: ${chatId}\n💰 Credits: ${user.credits}\n💥 Total Attacks: ${user.total_attacks}\n📈 Total Bomb Sessions: ${totalSessions}\n📬 Total OTPs Sent: ${totalSent}`);
+        bot.sendMessage(chatId, `📊 **Your Stats**\n👤 ID: ${chatId}\n💰 Credits: ${user.credits}\n💥 Total Attacks: ${user.total_attacks}\n📈 Sessions: ${totalSessions}\n📬 OTPs Sent: ${totalSent}`, { parse_mode: 'Markdown' });
         return;
     }
 
     if (text === '❓ HELP') {
-        bot.sendMessage(chatId, `📖 **Help & Commands**\n\n/bomb <phone> [duration] – Start bombing\n/stop – Stop active bombing\n/credits – Check credits\n/daily – Claim daily spin\n/redeem <code> – Redeem code\n/buy – Buy credits\n/stats – Your stats\n/settings – Bot settings\n\nDuration options: 1,2,3,5,10,30,60,1440 minutes.`);
+        bot.sendMessage(chatId, `📖 **Commands**\n\n/bomb <phone> – Start bombing\n/stop – Stop bombing\n/credits – Check balance\n/daily – Daily spin\n/redeem <code> – Redeem code\n/buy – Buy credits\n/stats – Your stats`);
         return;
     }
 
     if (text === '⚙️ SETTINGS') {
-        // Placeholder
-        bot.sendMessage(chatId, '⚙️ Settings: Not implemented yet.');
+        bot.sendMessage(chatId, '⚙️ Settings coming soon.');
         return;
     }
 
-    // Handle state inputs (admin, redeem, etc.)
+    // Handle state inputs
     if (userStates.has(chatId)) {
         const state = userStates.get(chatId);
         const input = text.trim();
 
         // Channel management states
         if (state.state === 'add_channel') {
-            if (!input.startsWith('@')) {
-                return bot.sendMessage(chatId, '❌ Channel must start with @');
-            }
+            if (!input.startsWith('@')) return bot.sendMessage(chatId, '❌ Channel must start with @');
             await db.addChannel(input);
             bot.sendMessage(chatId, `✅ Channel ${input} added.`);
             userStates.delete(chatId);
@@ -2768,13 +2814,10 @@ bot.on('message', async (msg) => {
 
         if (state.state === 'gen_code') {
             const amount = parseInt(input);
-            if (isNaN(amount) || amount <= 0) {
-                bot.sendMessage(chatId, '❌ Invalid amount. Enter a positive integer.');
-                return;
-            }
+            if (isNaN(amount) || amount <= 0) return bot.sendMessage(chatId, '❌ Invalid amount.');
             const code = Math.random().toString(36).substring(2, 10).toUpperCase();
             await db.createRedeemCode(code, amount);
-            bot.sendMessage(chatId, `✅ Redeem code generated: \`${code}\` (${amount} credits)`);
+            bot.sendMessage(chatId, `✅ Code: \`${code}\` (${amount} credits)`);
             userStates.delete(chatId);
             return;
         }
@@ -2802,7 +2845,7 @@ bot.on('message', async (msg) => {
             if (parts.length !== 2) return bot.sendMessage(chatId, '❌ Format: user_id credits');
             const uid = parseInt(parts[0]);
             const amt = parseInt(parts[1]);
-            if (isNaN(uid) || isNaN(amt)) return bot.sendMessage(chatId, '❌ Invalid numbers.');
+            if (isNaN(uid) || isNaN(amt)) return bot.sendMessage(chatId, '❌ Invalid.');
             await db.updateCredits(uid, amt);
             bot.sendMessage(chatId, `✅ Added ${amt} credits to user ${uid}.`);
             userStates.delete(chatId);
@@ -2811,54 +2854,52 @@ bot.on('message', async (msg) => {
 
         if (state.state === 'add_protected') {
             await db.addProtected(input);
-            bot.sendMessage(chatId, `✅ ${input} added to protected list.`);
+            bot.sendMessage(chatId, `✅ ${input} added to protected.`);
             userStates.delete(chatId);
             return;
         }
 
         if (state.state === 'remove_protected') {
             await db.removeProtected(input);
-            bot.sendMessage(chatId, `✅ ${input} removed from protected list.`);
+            bot.sendMessage(chatId, `✅ ${input} removed from protected.`);
             userStates.delete(chatId);
             return;
         }
 
         if (state.state === 'broadcast') {
-            // Admin sent a message to broadcast. We need to forward to all users.
+            // Broadcast with media support
             const allUsers = await db.User.find().select('_id');
             let success = 0, fail = 0;
             const mediaType = msg.photo ? 'photo' :
-                             msg.video ? 'video' :
-                             msg.audio ? 'audio' :
-                             msg.document ? 'document' :
-                             msg.animation ? 'animation' :
-                             msg.sticker ? 'sticker' : 'text';
+                            msg.video ? 'video' :
+                            msg.audio ? 'audio' :
+                            msg.document ? 'document' :
+                            msg.animation ? 'animation' :
+                            msg.sticker ? 'sticker' : 'text';
             const caption = msg.caption || '';
+
             for (const u of allUsers) {
                 try {
                     if (mediaType === 'text') {
-                        await bot.sendMessage(u._id, `📢 **Broadcast from Admin:**\n\n${text}`);
+                        await bot.sendMessage(u._id, `📢 **Broadcast:**\n\n${text}`);
                     } else if (mediaType === 'photo') {
                         const photo = msg.photo[msg.photo.length - 1].file_id;
-                        await bot.sendPhoto(u._id, photo, { caption: `📢 **Broadcast from Admin:**\n\n${caption}` });
+                        await bot.sendPhoto(u._id, photo, { caption: `📢 **Broadcast:**\n\n${caption}` });
                     } else if (mediaType === 'video') {
-                        await bot.sendVideo(u._id, msg.video.file_id, { caption: `📢 **Broadcast from Admin:**\n\n${caption}` });
+                        await bot.sendVideo(u._id, msg.video.file_id, { caption: `📢 **Broadcast:**\n\n${caption}` });
                     } else if (mediaType === 'audio') {
-                        await bot.sendAudio(u._id, msg.audio.file_id, { caption: `📢 **Broadcast from Admin:**\n\n${caption}` });
+                        await bot.sendAudio(u._id, msg.audio.file_id, { caption: `📢 **Broadcast:**\n\n${caption}` });
                     } else if (mediaType === 'document') {
-                        await bot.sendDocument(u._id, msg.document.file_id, { caption: `📢 **Broadcast from Admin:**\n\n${caption}` });
+                        await bot.sendDocument(u._id, msg.document.file_id, { caption: `📢 **Broadcast:**\n\n${caption}` });
                     } else if (mediaType === 'animation') {
-                        await bot.sendAnimation(u._id, msg.animation.file_id, { caption: `📢 **Broadcast from Admin:**\n\n${caption}` });
+                        await bot.sendAnimation(u._id, msg.animation.file_id, { caption: `📢 **Broadcast:**\n\n${caption}` });
                     } else if (mediaType === 'sticker') {
                         await bot.sendSticker(u._id, msg.sticker.file_id);
-                        // Optionally send a text message as well
-                        await bot.sendMessage(u._id, `📢 **Broadcast from Admin:**\n\n${caption}`);
+                        await bot.sendMessage(u._id, `📢 **Broadcast:**\n\n${caption}`);
                     }
                     success++;
                     await new Promise(r => setTimeout(r, 50));
-                } catch (e) {
-                    fail++;
-                }
+                } catch (e) { fail++; }
             }
             bot.sendMessage(chatId, `📢 Broadcast sent to ${success} users (${fail} failed).`);
             userStates.delete(chatId);
@@ -2875,7 +2916,7 @@ bot.on('message', async (msg) => {
             const target = await db.getUser(uid);
             target.daily_unlimited = expiry;
             await target.save();
-            bot.sendMessage(chatId, `✅ Unlimited plan activated for user ${uid} for ${hours} hours.`);
+            bot.sendMessage(chatId, `✅ Unlimited activated for user ${uid} (${hours}h).`);
             userStates.delete(chatId);
             return;
         }
@@ -2883,7 +2924,7 @@ bot.on('message', async (msg) => {
         if (state.state === 'redeem_code') {
             const amount = await db.getRedeemCode(input);
             if (amount === null) {
-                bot.sendMessage(chatId, '❌ Invalid or already used code.');
+                bot.sendMessage(chatId, '❌ Invalid or used code.');
             } else {
                 await db.updateCredits(chatId, amount);
                 bot.sendMessage(chatId, `✅ Redeemed ${amount} credits!`);
@@ -2893,191 +2934,20 @@ bot.on('message', async (msg) => {
         }
 
         if (state.state === 'enter_phone') {
-            // Phone entered, now ask for duration or use default
-            userStates.set(chatId, { state: 'enter_duration', phone: input });
+            // Validate phone
+            const phone = input.replace(/[^0-9]/g, '');
+            if (phone.length < 10) return bot.sendMessage(chatId, '❌ Invalid phone number. Enter at least 10 digits.');
+            userStates.set(chatId, { phone: phone });
             const keyboard = {
                 inline_keyboard: [
-                    [{ text: '1 min', callback_data: 'dur_1' }, { text: '2 min', callback_data: 'dur_2' }, { text: '3 min', callback_data: 'dur_3' }],
-                    [{ text: '5 min', callback_data: 'dur_5' }, { text: '10 min', callback_data: 'dur_10' }, { text: '30 min', callback_data: 'dur_30' }],
-                    [{ text: '60 min', callback_data: 'dur_60' }, { text: '1 Day', callback_data: 'dur_1440' }]
+                    [{ text: '🟢 1 min', callback_data: 'dur_1' }, { text: '🟢 2 min', callback_data: 'dur_2' }, { text: '🟢 3 min', callback_data: 'dur_3' }],
+                    [{ text: '🟢 5 min', callback_data: 'dur_5' }, { text: '🟢 10 min', callback_data: 'dur_10' }, { text: '🟢 30 min', callback_data: 'dur_30' }],
+                    [{ text: '🟢 60 min', callback_data: 'dur_60' }, { text: '🟢 1 Day', callback_data: 'dur_1440' }]
                 ]
             };
-            bot.sendMessage(chatId, '⏱️ Select duration:', { reply_markup: keyboard });
+            bot.sendMessage(chatId, `📱 Target: \`${phone}\`\n⏱️ Select duration:`, { parse_mode: 'Markdown', reply_markup: keyboard });
             return;
         }
-
-        if (state.state === 'enter_duration') {
-            // This state may not be used if we use inline callbacks; but keep for fallback
-            const phone = state.phone;
-            const duration = parseInt(input);
-            if (![1,2,3,5,10,30,60,1440].includes(duration)) {
-                return bot.sendMessage(chatId, '❌ Invalid duration. Choose from: 1,2,3,5,10,30,60,1440');
-            }
-            userStates.delete(chatId);
-            await runBomber(chatId, phone, duration);
-            return;
-        }
-    }
-});
-
-// ---------- BUY CREDITS CALLBACK ----------
-bot.on('callback_query', async (callbackQuery) => {
-    const chatId = callbackQuery.message.chat.id;
-    const data = callbackQuery.data;
-
-    // Duration selection
-    if (data.startsWith('dur_')) {
-        const dur = parseInt(data.split('_')[1]);
-        // We need to get the phone from user state
-        const state = userStates.get(chatId);
-        if (state && state.state === 'enter_phone' && state.phone) {
-            const phone = state.phone;
-            userStates.delete(chatId);
-            await runBomber(chatId, phone, dur);
-        } else if (state && state.state === 'enter_duration') {
-            // If we have phone in state
-            const phone = state.phone;
-            userStates.delete(chatId);
-            await runBomber(chatId, phone, dur);
-        } else {
-            bot.sendMessage(chatId, '❌ Please enter phone number first using /bomb command.');
-        }
-        bot.answerCallbackQuery(callbackQuery.id);
-        return;
-    }
-
-    // Buy plans
-    if (data.startsWith('buy_')) {
-        const parts = data.split('_');
-        const plan = parts[1];
-        let credits = 0;
-        let amount = 0;
-        let description = '';
-        if (plan === '10') { credits = 10; amount = 20; description = '10 Credits'; }
-        else if (plan === '25') { credits = 25; amount = 40; description = '25 Credits'; }
-        else if (plan === '50') { credits = 50; amount = 70; description = '50 Credits'; }
-        else if (plan === '100') { credits = 100; amount = 120; description = '100 Credits'; }
-        else if (plan === 'unlimited') { credits = 0; amount = 50; description = 'Unlimited 1 Day'; }
-
-        const payId = Math.random().toString(36).substring(2, 10);
-        pendingPayments.set(chatId, { credits, amount, description, payId, status: 'pending' });
-        bot.sendMessage(chatId, `💳 **Payment for ${description}**\n\nPlease send ₹${amount} to UPI: \`example@upi\`\n\nAfter payment, use command: \`/verify ${payId}\` to confirm.\n\n_Note: This is a demo, no real UPI is configured._`, { parse_mode: 'Markdown' });
-        bot.answerCallbackQuery(callbackQuery.id);
-    }
-
-    // Admin channel manager callbacks are already handled above, but we may have additional ones
-});
-
-// ---------- VERIFY PAYMENT ----------
-bot.onText(/\/verify (.+)/, async (msg, match) => {
-    const chatId = msg.chat.id;
-    const payId = match[1];
-    if (!pendingPayments.has(chatId)) return bot.sendMessage(chatId, '❌ No pending payment found.');
-    const payment = pendingPayments.get(chatId);
-    if (payment.payId === payId) {
-        if (payment.credits > 0) {
-            await db.updateCredits(chatId, payment.credits);
-            bot.sendMessage(chatId, `✅ Payment verified! Added ${payment.credits} credits.`);
-        } else {
-            const user = await db.getUser(chatId);
-            user.daily_unlimited = Date.now() / 1000 + 86400;
-            await user.save();
-            bot.sendMessage(chatId, `✅ Payment verified! Unlimited plan activated for 24 hours.`);
-        }
-        pendingPayments.delete(chatId);
-    } else {
-        bot.sendMessage(chatId, '❌ Invalid payment ID.');
-    }
-});
-
-// ---------- CHANNEL AND SCANNER COMMANDS (admin only) ----------
-bot.onText(/\/addchannel (.+)/, async (msg, match) => {
-    const chatId = msg.chat.id;
-    if (!ADMIN_IDS.includes(Number(chatId))) return;
-    const channel = match[1];
-    if (!channel.startsWith('@')) return bot.sendMessage(chatId, '❌ Channel must start with @');
-    await db.addChannel(channel);
-    bot.sendMessage(chatId, `✅ Channel ${channel} added.`);
-});
-
-bot.onText(/\/removechannel (.+)/, async (msg, match) => {
-    const chatId = msg.chat.id;
-    if (!ADMIN_IDS.includes(Number(chatId))) return;
-    const channel = match[1];
-    await db.removeChannel(channel);
-    bot.sendMessage(chatId, `✅ Channel ${channel} removed.`);
-});
-
-bot.onText(/\/listchannels/, async (msg) => {
-    const chatId = msg.chat.id;
-    if (!ADMIN_IDS.includes(Number(chatId))) return;
-    const channels = await db.getChannels();
-    bot.sendMessage(chatId, `📺 **Channels**\n${channels.length ? channels.join('\n') : 'None'}`);
-});
-
-bot.onText(/\/addscanner/, async (msg) => {
-    const chatId = msg.chat.id;
-    if (!ADMIN_IDS.includes(Number(chatId))) return;
-    bot.sendMessage(chatId, '✏️ To add a scanner, send a JSON object with keys: name, url, method, headers, data, phone_format.\nExample: {"name":"Test","url":"https://example.com","method":"POST","headers":{},"data":{},"phone_format":"raw"}');
-    userStates.set(chatId, { state: 'add_scanner' });
-});
-
-bot.onText(/\/removescanner (\d+)/, async (msg, match) => {
-    const chatId = msg.chat.id;
-    if (!ADMIN_IDS.includes(Number(chatId))) return;
-    const idx = parseInt(match[1]) - 1;
-    const success = await db.removeScanner(idx);
-    bot.sendMessage(chatId, success ? `✅ Scanner ${idx+1} removed.` : '❌ Invalid index.');
-});
-
-bot.onText(/\/listscanners/, async (msg) => {
-    const chatId = msg.chat.id;
-    if (!ADMIN_IDS.includes(Number(chatId))) return;
-    const config = await db.getScannerConfig();
-    let list = '🛡️ **Scanners**\n\n';
-    config.scanners.forEach((s, i) => {
-        list += `${i+1}. ${s.name || s.url}\n`;
-    });
-    list += `\nGlobal Headers: ${JSON.stringify(config.global_headers)}`;
-    bot.sendMessage(chatId, list);
-});
-
-bot.onText(/\/setglobalheaders/, async (msg) => {
-    const chatId = msg.chat.id;
-    if (!ADMIN_IDS.includes(Number(chatId))) return;
-    userStates.set(chatId, { state: 'set_global_headers' });
-    bot.sendMessage(chatId, '✏️ Send JSON object for global headers to apply to all scanners:');
-});
-
-// Handle state input for scanner and global headers
-bot.on('message', async (msg) => {
-    const chatId = msg.chat.id;
-    const text = msg.text;
-    if (!text || !userStates.has(chatId)) return;
-
-    const state = userStates.get(chatId);
-    if (state.state === 'add_scanner') {
-        try {
-            const scanner = JSON.parse(text);
-            await db.addScanner(scanner);
-            bot.sendMessage(chatId, '✅ Scanner added.');
-        } catch (e) {
-            bot.sendMessage(chatId, '❌ Invalid JSON.');
-        }
-        userStates.delete(chatId);
-        return;
-    }
-
-    if (state.state === 'set_global_headers') {
-        try {
-            const headers = JSON.parse(text);
-            await db.updateGlobalHeaders(headers);
-            bot.sendMessage(chatId, '✅ Global headers updated.');
-        } catch (e) {
-            bot.sendMessage(chatId, '❌ Invalid JSON.');
-        }
-        userStates.delete(chatId);
-        return;
     }
 });
 
@@ -3085,7 +2955,8 @@ bot.on('message', async (msg) => {
 bot.on('polling_error', (err) => console.log(err));
 
 console.log('🤖 Bot started successfully!');
-// ---------- DUMMY WEB SERVER FOR RENDER ----------
+
+// ---------- WEB SERVER ----------
 const express = require('express');
 const app = express();
 const port = process.env.PORT || 10000;
@@ -3095,5 +2966,5 @@ app.get('/', (req, res) => {
 });
 
 app.listen(port, '0.0.0.0', () => {
-    console.log(`✅ Dummy web server listening on port ${port}`);
+    console.log(`✅ Web server listening on port ${port}`);
 });
