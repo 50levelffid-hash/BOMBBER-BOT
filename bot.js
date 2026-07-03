@@ -2958,3 +2958,15 @@ bot.on('message', async (msg) => {
 bot.on('polling_error', (err) => console.log(err));
 
 console.log('🤖 Bot started successfully!');
+// ---------- DUMMY WEB SERVER FOR RENDER ----------
+const express = require('express');
+const app = express();
+const port = process.env.PORT || 10000;
+
+app.get('/', (req, res) => {
+    res.send('🤖 Telegram Bot is running!');
+});
+
+app.listen(port, '0.0.0.0', () => {
+    console.log(`✅ Dummy web server listening on port ${port}`);
+});
