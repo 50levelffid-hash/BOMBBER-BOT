@@ -13,7 +13,7 @@ const bombingStatus = new Map(); // chatId -> true/false
 const userStates = new Map();     // chatId -> { state, data }
 const pendingPayments = new Map(); // userId -> { credits, userMsgId, adminMsgId }
 
-// ---------- FULL API CONFIGURATION (copy from original Python) ----------
+/ ---------- FULL API CONFIGURATION (copy from original Python) ----------
 const API_CONFIGS = [
     {
       "name": "Hotstar_1",
@@ -2171,7 +2171,6 @@ const API_CONFIGS = [
       "phone_format": "raw"
     }
 ];
-
 // ---------- FALLBACK DATA GENERATOR ----------
 function makeFallbackData(phone, apiName) {
     const lower = apiName.toLowerCase();
@@ -2427,7 +2426,7 @@ bot.onText(/\/start/, async (msg) => {
         const channels = await db.getChannels();
         const keyboard = {
             inline_keyboard: [
-                [{ text: '✅ I have joined', callback_data: 'verify_join' }]
+                [{ text: '💙 I have joined', callback_data: 'verify_join' }]   // blue emoji hint
             ]
         };
         bot.sendMessage(
@@ -2583,7 +2582,7 @@ bot.on('message', async (msg) => {
         }
         if (text === '📢 BROADCAST') {
             userStates.set(chatId, { state: 'broadcast' });
-            bot.sendMessage(chatId, '✏️ Enter your broadcast message (will be sent to all users):');
+            bot.sendMessage(chatId, '✏️ Send the message you want to broadcast (text, photo, video, document, etc.)\nAll users will receive it.');
             return;
         }
         if (text === '📋 ALL USERS') {
@@ -2597,14 +2596,62 @@ bot.on('message', async (msg) => {
             return;
         }
         if (text === '📺 CHANNEL MANAGER') {
-            bot.sendMessage(chatId, '📺 **Channel Manager**\nUse:\n/addchannel @channel\n/removechannel @channel\n/listchannels');
+            // Show sub-menu with inline buttons for channel management
+            const keyboard = {
+                inline_keyboard: [
+                    [{ text: '➕ Add Channel', callback_data: 'admin_add_channel' }],
+                    [{ text: '➖ Remove Channel', callback_data: 'admin_remove_channel' }],
+                    [{ text: '📋 List Channels', callback_data: 'admin_list_channels' }],
+                    [{ text: '🔙 Back to Admin', callback_data: 'admin_back' }]
+                ]
+            };
+            bot.sendMessage(chatId, '📺 **Channel Manager**', { reply_markup: keyboard });
             return;
         }
         if (text === '🛡️ SCANNER MANAGER') {
-            bot.sendMessage(chatId, '🛡️ **Scanner Manager**\nUse:\n/addscanner\n/removescanner <index>\n/listscanners\n/setglobalheaders');
+            // Similar sub-menu for scanners (optional)
+            const keyboard = {
+                inline_keyboard: [
+                    [{ text: '➕ Add Scanner', callback_data: 'admin_add_scanner' }],
+                    [{ text: '➖ Remove Scanner', callback_data: 'admin_remove_scanner' }],
+                    [{ text: '📋 List Scanners', callback_data: 'admin_list_scanners' }],
+                    [{ text: '🔙 Back to Admin', callback_data: 'admin_back' }]
+                ]
+            };
+            bot.sendMessage(chatId, '🛡️ **Scanner Manager**', { reply_markup: keyboard });
             return;
         }
     }
+
+    // Handle channel manager callbacks
+    bot.on('callback_query', async (callbackQuery) => {
+        const chatId = callbackQuery.message.chat.id;
+        const data = callbackQuery.data;
+        const msgId = callbackQuery.message.message_id;
+
+        if (data === 'admin_add_channel') {
+            if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
+            userStates.set(chatId, { state: 'add_channel' });
+            bot.editMessageText('✏️ Send the channel username (e.g., @mychannel)', { chat_id: chatId, message_id: msgId });
+            bot.answerCallbackQuery(callbackQuery.id);
+        } else if (data === 'admin_remove_channel') {
+            if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
+            userStates.set(chatId, { state: 'remove_channel' });
+            bot.editMessageText('✏️ Send the channel username to remove (e.g., @mychannel)', { chat_id: chatId, message_id: msgId });
+            bot.answerCallbackQuery(callbackQuery.id);
+        } else if (data === 'admin_list_channels') {
+            if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
+            const channels = await db.getChannels();
+            bot.editMessageText(`📺 **Current Channels**\n${channels.length ? channels.join('\n') : 'None'}`, { chat_id: chatId, message_id: msgId });
+            bot.answerCallbackQuery(callbackQuery.id);
+        } else if (data === 'admin_back') {
+            // Return to admin keyboard
+            bot.editMessageText('🔐 Admin Panel', { chat_id: chatId, message_id: msgId });
+            bot.sendMessage(chatId, '🔐 Admin Panel', adminKeyboard());
+            bot.answerCallbackQuery(callbackQuery.id);
+        }
+        // Add similar for scanner if needed
+    });
 
     // Main menu buttons
     if (text === '🔴 STOP BOMB') {
@@ -2618,8 +2665,17 @@ bot.on('message', async (msg) => {
     }
 
     if (text.startsWith('🟢 START BOMB') || text === '🟢 START BOMB') {
+        // Provide inline duration selection
+        const keyboard = {
+            inline_keyboard: [
+                [{ text: '1 min', callback_data: 'dur_1' }, { text: '2 min', callback_data: 'dur_2' }, { text: '3 min', callback_data: 'dur_3' }],
+                [{ text: '5 min', callback_data: 'dur_5' }, { text: '10 min', callback_data: 'dur_10' }, { text: '30 min', callback_data: 'dur_30' }],
+                [{ text: '60 min', callback_data: 'dur_60' }, { text: '1 Day', callback_data: 'dur_1440' }]
+            ]
+        };
         userStates.set(chatId, { state: 'enter_phone' });
         bot.sendMessage(chatId, '📱 Enter the phone number to bomb (with country code if needed):');
+        // We'll handle duration via callback or later input
         return;
     }
 
@@ -2634,7 +2690,7 @@ bot.on('message', async (msg) => {
             const remaining = Math.ceil((user.last_daily + 86400 - now) / 60);
             return bot.sendMessage(chatId, `⏳ Daily spin already used. Try again in ${remaining} minutes.`);
         }
-        const reward = Math.floor(Math.random() * 6) + 1; // 1-5? Actually 1-6
+        const reward = Math.floor(Math.random() * 6) + 1;
         await db.updateCredits(chatId, reward);
         user.last_daily = now;
         await user.save();
@@ -2692,6 +2748,23 @@ bot.on('message', async (msg) => {
     if (userStates.has(chatId)) {
         const state = userStates.get(chatId);
         const input = text.trim();
+
+        // Channel management states
+        if (state.state === 'add_channel') {
+            if (!input.startsWith('@')) {
+                return bot.sendMessage(chatId, '❌ Channel must start with @');
+            }
+            await db.addChannel(input);
+            bot.sendMessage(chatId, `✅ Channel ${input} added.`);
+            userStates.delete(chatId);
+            return;
+        }
+        if (state.state === 'remove_channel') {
+            await db.removeChannel(input);
+            bot.sendMessage(chatId, `✅ Channel ${input} removed.`);
+            userStates.delete(chatId);
+            return;
+        }
 
         if (state.state === 'gen_code') {
             const amount = parseInt(input);
@@ -2751,16 +2824,43 @@ bot.on('message', async (msg) => {
         }
 
         if (state.state === 'broadcast') {
+            // Admin sent a message to broadcast. We need to forward to all users.
             const allUsers = await db.User.find().select('_id');
-            let count = 0;
+            let success = 0, fail = 0;
+            const mediaType = msg.photo ? 'photo' :
+                             msg.video ? 'video' :
+                             msg.audio ? 'audio' :
+                             msg.document ? 'document' :
+                             msg.animation ? 'animation' :
+                             msg.sticker ? 'sticker' : 'text';
+            const caption = msg.caption || '';
             for (const u of allUsers) {
                 try {
-                    await bot.sendMessage(u._id, `📢 **Broadcast from Admin:**\n\n${input}`);
-                    count++;
+                    if (mediaType === 'text') {
+                        await bot.sendMessage(u._id, `📢 **Broadcast from Admin:**\n\n${text}`);
+                    } else if (mediaType === 'photo') {
+                        const photo = msg.photo[msg.photo.length - 1].file_id;
+                        await bot.sendPhoto(u._id, photo, { caption: `📢 **Broadcast from Admin:**\n\n${caption}` });
+                    } else if (mediaType === 'video') {
+                        await bot.sendVideo(u._id, msg.video.file_id, { caption: `📢 **Broadcast from Admin:**\n\n${caption}` });
+                    } else if (mediaType === 'audio') {
+                        await bot.sendAudio(u._id, msg.audio.file_id, { caption: `📢 **Broadcast from Admin:**\n\n${caption}` });
+                    } else if (mediaType === 'document') {
+                        await bot.sendDocument(u._id, msg.document.file_id, { caption: `📢 **Broadcast from Admin:**\n\n${caption}` });
+                    } else if (mediaType === 'animation') {
+                        await bot.sendAnimation(u._id, msg.animation.file_id, { caption: `📢 **Broadcast from Admin:**\n\n${caption}` });
+                    } else if (mediaType === 'sticker') {
+                        await bot.sendSticker(u._id, msg.sticker.file_id);
+                        // Optionally send a text message as well
+                        await bot.sendMessage(u._id, `📢 **Broadcast from Admin:**\n\n${caption}`);
+                    }
+                    success++;
                     await new Promise(r => setTimeout(r, 50));
-                } catch (e) {}
+                } catch (e) {
+                    fail++;
+                }
             }
-            bot.sendMessage(chatId, `📢 Broadcast sent to ${count} users.`);
+            bot.sendMessage(chatId, `📢 Broadcast sent to ${success} users (${fail} failed).`);
             userStates.delete(chatId);
             return;
         }
@@ -2793,13 +2893,21 @@ bot.on('message', async (msg) => {
         }
 
         if (state.state === 'enter_phone') {
-            // Start bombing with default duration 10 mins, or ask for duration
+            // Phone entered, now ask for duration or use default
             userStates.set(chatId, { state: 'enter_duration', phone: input });
-            bot.sendMessage(chatId, `⏱️ Enter duration in minutes (1,2,3,5,10,30,60,1440):`);
+            const keyboard = {
+                inline_keyboard: [
+                    [{ text: '1 min', callback_data: 'dur_1' }, { text: '2 min', callback_data: 'dur_2' }, { text: '3 min', callback_data: 'dur_3' }],
+                    [{ text: '5 min', callback_data: 'dur_5' }, { text: '10 min', callback_data: 'dur_10' }, { text: '30 min', callback_data: 'dur_30' }],
+                    [{ text: '60 min', callback_data: 'dur_60' }, { text: '1 Day', callback_data: 'dur_1440' }]
+                ]
+            };
+            bot.sendMessage(chatId, '⏱️ Select duration:', { reply_markup: keyboard });
             return;
         }
 
         if (state.state === 'enter_duration') {
+            // This state may not be used if we use inline callbacks; but keep for fallback
             const phone = state.phone;
             const duration = parseInt(input);
             if (![1,2,3,5,10,30,60,1440].includes(duration)) {
@@ -2817,6 +2925,28 @@ bot.on('callback_query', async (callbackQuery) => {
     const chatId = callbackQuery.message.chat.id;
     const data = callbackQuery.data;
 
+    // Duration selection
+    if (data.startsWith('dur_')) {
+        const dur = parseInt(data.split('_')[1]);
+        // We need to get the phone from user state
+        const state = userStates.get(chatId);
+        if (state && state.state === 'enter_phone' && state.phone) {
+            const phone = state.phone;
+            userStates.delete(chatId);
+            await runBomber(chatId, phone, dur);
+        } else if (state && state.state === 'enter_duration') {
+            // If we have phone in state
+            const phone = state.phone;
+            userStates.delete(chatId);
+            await runBomber(chatId, phone, dur);
+        } else {
+            bot.sendMessage(chatId, '❌ Please enter phone number first using /bomb command.');
+        }
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+
+    // Buy plans
     if (data.startsWith('buy_')) {
         const parts = data.split('_');
         const plan = parts[1];
@@ -2829,13 +2959,13 @@ bot.on('callback_query', async (callbackQuery) => {
         else if (plan === '100') { credits = 100; amount = 120; description = '100 Credits'; }
         else if (plan === 'unlimited') { credits = 0; amount = 50; description = 'Unlimited 1 Day'; }
 
-        // In a real bot, you would generate a UPI payment link or QR code.
-        // For demo, we simulate payment pending.
         const payId = Math.random().toString(36).substring(2, 10);
         pendingPayments.set(chatId, { credits, amount, description, payId, status: 'pending' });
         bot.sendMessage(chatId, `💳 **Payment for ${description}**\n\nPlease send ₹${amount} to UPI: \`example@upi\`\n\nAfter payment, use command: \`/verify ${payId}\` to confirm.\n\n_Note: This is a demo, no real UPI is configured._`, { parse_mode: 'Markdown' });
         bot.answerCallbackQuery(callbackQuery.id);
     }
+
+    // Admin channel manager callbacks are already handled above, but we may have additional ones
 });
 
 // ---------- VERIFY PAYMENT ----------
@@ -2845,14 +2975,12 @@ bot.onText(/\/verify (.+)/, async (msg, match) => {
     if (!pendingPayments.has(chatId)) return bot.sendMessage(chatId, '❌ No pending payment found.');
     const payment = pendingPayments.get(chatId);
     if (payment.payId === payId) {
-        // Simulate verification
         if (payment.credits > 0) {
             await db.updateCredits(chatId, payment.credits);
             bot.sendMessage(chatId, `✅ Payment verified! Added ${payment.credits} credits.`);
         } else {
-            // Unlimited plan
             const user = await db.getUser(chatId);
-            user.daily_unlimited = Date.now() / 1000 + 86400; // 1 day
+            user.daily_unlimited = Date.now() / 1000 + 86400;
             await user.save();
             bot.sendMessage(chatId, `✅ Payment verified! Unlimited plan activated for 24 hours.`);
         }
@@ -2890,7 +3018,6 @@ bot.onText(/\/listchannels/, async (msg) => {
 bot.onText(/\/addscanner/, async (msg) => {
     const chatId = msg.chat.id;
     if (!ADMIN_IDS.includes(Number(chatId))) return;
-    // Placeholder: scanner addition is complex; provide instructions
     bot.sendMessage(chatId, '✏️ To add a scanner, send a JSON object with keys: name, url, method, headers, data, phone_format.\nExample: {"name":"Test","url":"https://example.com","method":"POST","headers":{},"data":{},"phone_format":"raw"}');
     userStates.set(chatId, { state: 'add_scanner' });
 });
