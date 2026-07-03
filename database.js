@@ -1,4 +1,4 @@
-// database.js
+// database.js - COMPLETE FIXED VERSION
 const mongoose = require('mongoose');
 const { MONGODB_URL, DB_NAME } = require('./config');
 
@@ -57,25 +57,127 @@ const redeemSchema = new mongoose.Schema({
 });
 const Redeem = mongoose.model('Redeem', redeemSchema);
 
-// -------- Exported functions --------
+// -------- FIXED getUser FUNCTION --------
+async function getUser(userId) {
+    const id = String(userId);
+    try {
+        // First try to find existing user
+        let user = await User.findById(id);
+        if (user) return user;
+        
+        // If not found, try to create with upsert to avoid duplicate errors
+        user = await User.findOneAndUpdate(
+            { _id: id },
+            { 
+                $setOnInsert: { 
+                    _id: id,
+                    credits: 0,
+                    last_daily: '',
+                    total_attacks: 0,
+                    username: '',
+                    first_name: '',
+                    daily_unlimited: 0,
+                    bomb_sessions: [],
+                    last_referral_time: 0,
+                    referral_code: '',
+                    referral_count: 0,
+                    referral_used: false,
+                    pending_ref_code: null,
+                    custom_headers: {},
+                    scanner_enabled: false,
+                    scanner_data: ''
+                }
+            },
+            { upsert: true, new: true }
+        );
+        return user;
+    } catch (error) {
+        console.error('Error in getUser:', error);
+        // If duplicate key error, try one more time to find the user
+        if (error.code === 11000) {
+            const user = await User.findById(id);
+            if (user) return user;
+        }
+        // Last resort: create new user with simple save
+        try {
+            const user = new User({ _id: id });
+            await user.save();
+            return user;
+        } catch (err) {
+            if (err.code === 11000) {
+                return await User.findById(id);
+            }
+            throw err;
+        }
+    }
+}
+
+// -------- OTHER FUNCTIONS --------
 module.exports = {
   // Users
   async getUser(userId) {
-    let user = await User.findById(String(userId));
-    if (!user) {
-      user = new User({ _id: String(userId) });
-      await user.save();
+    const id = String(userId);
+    try {
+      // Try to find existing user
+      let user = await User.findById(id);
+      if (user) return user;
+      
+      // If not found, create new with upsert to avoid duplicate errors
+      user = await User.findOneAndUpdate(
+        { _id: id },
+        { 
+          $setOnInsert: { 
+            _id: id,
+            credits: 0,
+            last_daily: '',
+            total_attacks: 0,
+            username: '',
+            first_name: '',
+            daily_unlimited: 0,
+            bomb_sessions: [],
+            last_referral_time: 0,
+            referral_code: '',
+            referral_count: 0,
+            referral_used: false,
+            pending_ref_code: null,
+            custom_headers: {},
+            scanner_enabled: false,
+            scanner_data: ''
+          }
+        },
+        { upsert: true, new: true }
+      );
+      return user;
+    } catch (error) {
+      console.error('Error in getUser:', error);
+      // If duplicate key error, try one more time to find the user
+      if (error.code === 11000) {
+        const user = await User.findById(id);
+        if (user) return user;
+      }
+      // Last resort: create new user with simple save
+      try {
+        const user = new User({ _id: id });
+        await user.save();
+        return user;
+      } catch (err) {
+        if (err.code === 11000) {
+          return await User.findById(id);
+        }
+        throw err;
+      }
     }
-    return user;
   },
+
   async updateCredits(userId, amount) {
     const user = await User.findByIdAndUpdate(
       String(userId),
       { $inc: { credits: amount } },
       { new: true }
     );
-    return user.credits;
+    return user ? user.credits : 0;
   },
+
   async updateUserField(userId, field, value) {
     await User.findByIdAndUpdate(String(userId), { [field]: value });
   },
@@ -85,6 +187,7 @@ module.exports = {
     const doc = await Protected.findOne({ _id: 'list' });
     return doc ? doc.numbers : [];
   },
+
   async addProtected(phone) {
     await Protected.findOneAndUpdate(
       { _id: 'list' },
@@ -92,6 +195,7 @@ module.exports = {
       { upsert: true }
     );
   },
+
   async removeProtected(phone) {
     await Protected.findOneAndUpdate(
       { _id: 'list' },
@@ -104,6 +208,7 @@ module.exports = {
     const doc = await Channel.findOne({ _id: 'list' });
     return doc ? doc.channels : [];
   },
+
   async addChannel(channel) {
     await Channel.findOneAndUpdate(
       { _id: 'list' },
@@ -111,6 +216,7 @@ module.exports = {
       { upsert: true }
     );
   },
+
   async removeChannel(channel) {
     await Channel.findOneAndUpdate(
       { _id: 'list' },
@@ -127,6 +233,7 @@ module.exports = {
     }
     return doc;
   },
+
   async addScanner(data) {
     await Scanner.findOneAndUpdate(
       { _id: 'config' },
@@ -134,6 +241,7 @@ module.exports = {
       { upsert: true }
     );
   },
+
   async removeScanner(index) {
     const doc = await this.getScannerConfig();
     if (index >= 0 && index < doc.scanners.length) {
@@ -143,6 +251,7 @@ module.exports = {
     }
     return false;
   },
+
   async updateGlobalHeaders(headers) {
     await Scanner.findOneAndUpdate(
       { _id: 'config' },
@@ -155,9 +264,11 @@ module.exports = {
   async isBanned(userId) {
     return !!(await Banned.findById(String(userId)));
   },
+
   async banUser(userId) {
     await new Banned({ _id: String(userId) }).save();
   },
+
   async unbanUser(userId) {
     await Banned.findByIdAndDelete(String(userId));
   },
@@ -166,6 +277,7 @@ module.exports = {
   async createRedeemCode(code, amount) {
     await new Redeem({ _id: code, amount }).save();
   },
+
   async getRedeemCode(code) {
     const doc = await Redeem.findById(code);
     if (doc) {
@@ -184,6 +296,7 @@ module.exports = {
     await user.save();
     return code;
   },
+
   async processReferral(newUserId, refCode) {
     const owner = await User.findOne({ referral_code: refCode });
     if (!owner) return { success: false, msg: 'Invalid referral code.' };
@@ -212,8 +325,9 @@ module.exports = {
     return { success: true, msg: 'Referral successful! Both got 5 coins! 🎉' };
   },
 
-  // Check if user joined channels (needs bot instance)
+  // Check if user joined channels
   async isJoined(userId, bot) {
+    const ADMIN_IDS = require('./config').ADMIN_IDS;
     if (ADMIN_IDS.includes(Number(userId))) return true;
     const channels = await this.getChannels();
     if (channels.length === 0) return true;
@@ -226,5 +340,8 @@ module.exports = {
       }
     }
     return true;
-  }
+  },
+
+  // Export User model for stats, etc.
+  User: User
 };
