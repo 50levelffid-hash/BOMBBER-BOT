@@ -1,7 +1,7 @@
 {
   "name": "otp-bomber-bot",
   "version": "1.0.0",
-  "description": "Telegram OTP Bomber Bot with MongoDB",
+  "description": "Telegram OTP Bomber Bot with all Python features",
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js"
