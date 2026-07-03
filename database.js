@@ -1,6 +1,7 @@
 // database.js - COMPLETE FIXED VERSION
 const mongoose = require('mongoose');
 const { MONGODB_URL, DB_NAME } = require('./config');
+const { ADMIN_IDS } = require('./config');   // Import admin IDs for referral exemption
 
 mongoose.connect(MONGODB_URL, { dbName: DB_NAME })
   .then(() => console.log('✅ MongoDB connected'))
@@ -8,13 +9,13 @@ mongoose.connect(MONGODB_URL, { dbName: DB_NAME })
 
 // -------- Schemas --------
 const userSchema = new mongoose.Schema({
-  _id: { type: String, required: true },        // user ID as string
+  _id: { type: String, required: true },
   credits: { type: Number, default: 0 },
   last_daily: { type: String, default: '' },
   total_attacks: { type: Number, default: 0 },
   username: { type: String, default: '' },
   first_name: { type: String, default: '' },
-  daily_unlimited: { type: Number, default: 0 }, // timestamp when active
+  daily_unlimited: { type: Number, default: 0 },
   bomb_sessions: { type: Array, default: [] },
   last_referral_time: { type: Number, default: 0 },
   referral_code: { type: String, default: '' },
@@ -52,7 +53,7 @@ const bannedSchema = new mongoose.Schema({
 const Banned = mongoose.model('Banned', bannedSchema);
 
 const redeemSchema = new mongoose.Schema({
-  _id: { type: String, required: true }, // code
+  _id: { type: String, required: true },
   amount: { type: Number, required: true },
 });
 const Redeem = mongoose.model('Redeem', redeemSchema);
@@ -61,11 +62,8 @@ const Redeem = mongoose.model('Redeem', redeemSchema);
 async function getUser(userId) {
     const id = String(userId);
     try {
-        // First try to find existing user
         let user = await User.findById(id);
         if (user) return user;
-        
-        // If not found, try to create with upsert to avoid duplicate errors
         user = await User.findOneAndUpdate(
             { _id: id },
             { 
@@ -93,12 +91,10 @@ async function getUser(userId) {
         return user;
     } catch (error) {
         console.error('Error in getUser:', error);
-        // If duplicate key error, try one more time to find the user
         if (error.code === 11000) {
             const user = await User.findById(id);
             if (user) return user;
         }
-        // Last resort: create new user with simple save
         try {
             const user = new User({ _id: id });
             await user.save();
@@ -114,15 +110,11 @@ async function getUser(userId) {
 
 // -------- OTHER FUNCTIONS --------
 module.exports = {
-  // Users
   async getUser(userId) {
     const id = String(userId);
     try {
-      // Try to find existing user
       let user = await User.findById(id);
       if (user) return user;
-      
-      // If not found, create new with upsert to avoid duplicate errors
       user = await User.findOneAndUpdate(
         { _id: id },
         { 
@@ -150,12 +142,10 @@ module.exports = {
       return user;
     } catch (error) {
       console.error('Error in getUser:', error);
-      // If duplicate key error, try one more time to find the user
       if (error.code === 11000) {
         const user = await User.findById(id);
         if (user) return user;
       }
-      // Last resort: create new user with simple save
       try {
         const user = new User({ _id: id });
         await user.save();
@@ -306,8 +296,12 @@ module.exports = {
     if (newUser.referral_used) return { success: false, msg: 'You have already used a referral code.' };
 
     const now = Date.now() / 1000;
-    if (owner.last_referral_time + 60 > now) {
-      return { success: false, msg: 'Please wait 1 minute between referrals.' };
+
+    // Cooldown: 1 minute between referrals, but admins are exempt
+    if (!ADMIN_IDS.includes(Number(owner._id))) {
+      if (owner.last_referral_time + 60 > now) {
+        return { success: false, msg: 'Please wait 1 minute between referrals.' };
+      }
     }
 
     // Give 5 coins to both
@@ -327,7 +321,6 @@ module.exports = {
 
   // Check if user joined channels
   async isJoined(userId, bot) {
-    const ADMIN_IDS = require('./config').ADMIN_IDS;
     if (ADMIN_IDS.includes(Number(userId))) return true;
     const channels = await this.getChannels();
     if (channels.length === 0) return true;
@@ -342,6 +335,5 @@ module.exports = {
     return true;
   },
 
-  // Export User model for stats, etc.
   User: User
 };
