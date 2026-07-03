@@ -1,7 +1,6 @@
-// database.js - Complete Fixed Version
+// database.js - Complete version with referral support
 const mongoose = require('mongoose');
-const { MONGODB_URL, DB_NAME } = require('./config');
-const { ADMIN_IDS } = require('./config');
+const { MONGODB_URL, DB_NAME, ADMIN_IDS } = require('./config');
 
 mongoose.connect(MONGODB_URL, { dbName: DB_NAME })
   .then(() => console.log('✅ MongoDB connected'))
@@ -11,7 +10,7 @@ mongoose.connect(MONGODB_URL, { dbName: DB_NAME })
 const userSchema = new mongoose.Schema({
   _id: { type: String, required: true },
   credits: { type: Number, default: 0 },
-  last_daily: { type: String, default: '' },
+  last_daily: { type: Number, default: 0 },
   total_attacks: { type: Number, default: 0 },
   username: { type: String, default: '' },
   first_name: { type: String, default: '' },
@@ -58,6 +57,14 @@ const redeemSchema = new mongoose.Schema({
 });
 const Redeem = mongoose.model('Redeem', redeemSchema);
 
+const referralSchema = new mongoose.Schema({
+  _id: { type: String, required: true },
+  code: { type: String, required: true },
+  count: { type: Number, default: 0 },
+  used_by: { type: [String], default: [] },
+});
+const Referral = mongoose.model('Referral', referralSchema);
+
 // -------- Functions --------
 async function getUser(userId) {
     const id = String(userId);
@@ -70,7 +77,7 @@ async function getUser(userId) {
                 $setOnInsert: { 
                     _id: id,
                     credits: 0,
-                    last_daily: '',
+                    last_daily: 0,
                     total_attacks: 0,
                     username: '',
                     first_name: '',
@@ -233,21 +240,29 @@ module.exports = {
     return code;
   },
 
+  async getReferralData(userId) {
+    const user = await this.getUser(userId);
+    return { code: user.referral_code, count: user.referral_count };
+  },
+
   async processReferral(newUserId, refCode) {
     const owner = await User.findOne({ referral_code: refCode });
     if (!owner) return { success: false, msg: 'Invalid referral code.' };
-    if (owner._id === String(newUserId)) return { success: false, msg: 'Cannot use your own code.' };
+    if (owner._id === String(newUserId)) return { success: false, msg: 'You cannot use your own referral code.' };
 
     const newUser = await this.getUser(newUserId);
-    if (newUser.referral_used) return { success: false, msg: 'Already used a referral code.' };
+    if (newUser.referral_used) return { success: false, msg: 'You have already used a referral code.' };
 
     const now = Date.now() / 1000;
+
+    // Cooldown: 1 minute between referrals, admins exempt
     if (!ADMIN_IDS.includes(Number(owner._id))) {
       if (owner.last_referral_time + 60 > now) {
         return { success: false, msg: 'Please wait 1 minute between referrals.' };
       }
     }
 
+    // Give 5 credits to both
     await this.updateCredits(owner._id, 5);
     await this.updateCredits(newUserId, 5);
 
@@ -259,7 +274,7 @@ module.exports = {
     newUser.pending_ref_code = null;
     await newUser.save();
 
-    return { success: true, msg: 'Referral successful! Both got 5 coins! 🎉' };
+    return { success: true, msg: 'Referral successful! Both got 5 credits! 🎉' };
   },
 
   async isJoined(userId, bot) {
