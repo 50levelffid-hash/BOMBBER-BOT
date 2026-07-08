@@ -4,6 +4,43 @@ const axios = require('axios');
 const { BOT_TOKEN, ADMIN_IDS } = require('./config');
 const db = require('./database');
 
+// ===== ERROR HANDLING TO PREVENT CRASH =====
+process.on('uncaughtException', (err) => {
+    console.error('❌ Uncaught Exception:', err.message);
+    console.error('Stack:', err.stack);
+    // Don't exit - keep bot running
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('❌ Unhandled Rejection at:', promise);
+    console.error('Reason:', reason);
+    // Don't exit - keep bot running
+});
+
+// Catch EFATAL errors specifically
+const originalEmit = process.emit;
+process.emit = function(event, error) {
+    if (event === 'uncaughtException') {
+        if (error && error.code === 'EFATAL') {
+            console.error('⚠️ EFATAL error caught and ignored:', error.message);
+            return true; // Prevent crash
+        }
+        if (error && error.message && error.message.includes('request-promise')) {
+            console.error('⚠️ Request error caught:', error.message);
+            return true;
+        }
+        if (error && error.message && error.message.includes('ECONNRESET')) {
+            console.error('⚠️ Connection reset error caught:', error.message);
+            return true;
+        }
+        if (error && error.message && error.message.includes('ETIMEDOUT')) {
+            console.error('⚠️ Timeout error caught:', error.message);
+            return true;
+        }
+    }
+    return originalEmit.apply(this, arguments);
+};
+
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
 // ---------- BOMBING STATUS ----------
@@ -2567,7 +2604,7 @@ async function showMainMenu(chatId) {
     bot.sendMessage(chatId, welcome, { parse_mode: 'Markdown', ...mainKeyboard() });
 }
 
-// Callback: verify_join
+// ---------- CALLBACK QUERY HANDLER ----------
 bot.on('callback_query', async (callbackQuery) => {
     const chatId = callbackQuery.message.chat.id;
     const data = callbackQuery.data;
@@ -2617,7 +2654,7 @@ bot.on('callback_query', async (callbackQuery) => {
         return;
     }
 
-    // ===== NEW: SMART BROADCAST CALLBACKS =====
+    // ===== SMART BROADCAST CALLBACKS =====
     if (data === 'smart_broadcast_start') {
         if (!ADMIN_IDS.includes(Number(chatId))) {
             return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only!', show_alert: true });
@@ -2912,17 +2949,13 @@ bot.on('message', async (msg) => {
     const user = await db.getUser(chatId);
 
     // ===== SMART BROADCAST MESSAGE HANDLER =====
-    // Check if user is in broadcast mode
     if (adminBroadcastState.has(chatId) && ADMIN_IDS.includes(Number(chatId))) {
         const state = adminBroadcastState.get(chatId);
         if (state.active) {
-            // Check for cancel command
             if (text === '/cancel' || text === 'Cancel' || text === '❌ Cancel') {
                 adminBroadcastState.delete(chatId);
                 return bot.sendMessage(chatId, '❌ Broadcast cancelled.');
             }
-            
-            // Process broadcast
             await processSmartBroadcast(chatId, msg);
             return;
         }
@@ -3416,219 +3449,269 @@ bot.on('message', async (msg) => {
     }
 });
 
-// ===== SMART BROADCAST PROCESSING FUNCTION =====
+// ===== SMART BROADCAST PROCESSING FUNCTION (FIXED) =====
 async function processSmartBroadcast(chatId, msg) {
-    // Get all users
-    const users = await db.User.find().select('_id');
-    const totalUsers = users.length;
-    
-    if (totalUsers === 0) {
-        return bot.sendMessage(chatId, '❌ No users found in database!');
-    }
-    
-    // Show processing message
-    const processingMsg = await bot.sendMessage(
-        chatId,
-        `⏳ **Preparing broadcast...**\n\n📊 Getting user list...`,
-        { parse_mode: 'Markdown' }
-    );
-    
-    // Detect message type
-    let messageType = 'text';
-    let mediaId = null;
-    let caption = msg.caption || '';
-    
-    if (msg.photo) {
-        messageType = 'photo';
-        mediaId = msg.photo[msg.photo.length - 1].file_id;
-    } else if (msg.video) {
-        messageType = 'video';
-        mediaId = msg.video.file_id;
-    } else if (msg.document) {
-        messageType = 'document';
-        mediaId = msg.document.file_id;
-    } else if (msg.audio) {
-        messageType = 'audio';
-        mediaId = msg.audio.file_id;
-    } else if (msg.voice) {
-        messageType = 'voice';
-        mediaId = msg.voice.file_id;
-    } else if (msg.sticker) {
-        messageType = 'sticker';
-        mediaId = msg.sticker.file_id;
-    } else if (msg.animation) {
-        messageType = 'animation';
-        mediaId = msg.animation.file_id;
-    } else if (msg.video_note) {
-        messageType = 'video_note';
-        mediaId = msg.video_note.file_id;
-    } else if (msg.poll) {
-        messageType = 'poll';
-    } else if (msg.location) {
-        messageType = 'location';
-    } else if (msg.contact) {
-        messageType = 'contact';
-    } else if (msg.game) {
-        messageType = 'game';
-    } else if (msg.text) {
-        messageType = 'text';
-    }
-    
-    // Start broadcasting
-    let success = 0, fail = 0, blocked = 0;
-    const startTime = Date.now();
-    const batchSize = 5;
-    
-    // Update initial progress
-    await bot.editMessageText(
-        `📢 **BROADCASTING...**\n\n` +
-        `📊 **Total Users:** ${totalUsers}\n` +
-        `✅ Success: 0\n` +
-        `❌ Failed: 0\n` +
-        `⏳ Progress: 0%\n` +
-        `📎 Type: ${messageType.toUpperCase()}`,
-        {
-            chat_id: chatId,
-            message_id: processingMsg.message_id,
-            parse_mode: 'Markdown'
-        }
-    );
-    
-    // Send in batches
-    for (let i = 0; i < users.length; i += batchSize) {
-        const batch = users.slice(i, i + batchSize);
+    try {
+        // Get all users
+        const users = await db.User.find().select('_id');
+        const totalUsers = users.length;
         
-        await Promise.all(batch.map(async (user) => {
+        if (totalUsers === 0) {
+            return bot.sendMessage(chatId, '❌ No users found in database!');
+        }
+        
+        // Show processing message
+        const processingMsg = await bot.sendMessage(
+            chatId,
+            `⏳ **Preparing broadcast...**\n\n📊 Getting user list...`,
+            { parse_mode: 'Markdown' }
+        );
+        
+        // ===== DETECT MESSAGE TYPE =====
+        let messageType = 'text';
+        let mediaId = null;
+        let caption = msg.caption || '';
+        
+        // Check ALL media types in correct order
+        if (msg.photo) {
+            messageType = 'photo';
+            mediaId = msg.photo[msg.photo.length - 1].file_id;
+            caption = msg.caption || '';
+        } else if (msg.video) {
+            messageType = 'video';
+            mediaId = msg.video.file_id;
+            caption = msg.caption || '';
+        } else if (msg.document) {
+            messageType = 'document';
+            mediaId = msg.document.file_id;
+            caption = msg.caption || '';
+        } else if (msg.audio) {
+            messageType = 'audio';
+            mediaId = msg.audio.file_id;
+            caption = msg.caption || '';
+        } else if (msg.voice) {
+            messageType = 'voice';
+            mediaId = msg.voice.file_id;
+            caption = msg.caption || '';
+        } else if (msg.sticker) {
+            messageType = 'sticker';
+            mediaId = msg.sticker.file_id;
+        } else if (msg.animation) {
+            messageType = 'animation';
+            mediaId = msg.animation.file_id;
+            caption = msg.caption || '';
+        } else if (msg.video_note) {
+            messageType = 'video_note';
+            mediaId = msg.video_note.file_id;
+        } else if (msg.poll) {
+            messageType = 'poll';
+        } else if (msg.location) {
+            messageType = 'location';
+        } else if (msg.contact) {
+            messageType = 'contact';
+        } else if (msg.game) {
+            messageType = 'game';
+        } else if (msg.text) {
+            messageType = 'text';
+        }
+        
+        // ===== START BROADCASTING =====
+        let success = 0, fail = 0, blocked = 0;
+        const startTime = Date.now();
+        const batchSize = 3;
+        
+        // Update initial progress
+        await bot.editMessageText(
+            `📢 **BROADCASTING...**\n\n` +
+            `📊 **Total Users:** ${totalUsers}\n` +
+            `✅ Success: 0\n` +
+            `❌ Failed: 0\n` +
+            `⏳ Progress: 0%\n` +
+            `📎 Type: ${messageType.toUpperCase()}`,
+            {
+                chat_id: chatId,
+                message_id: processingMsg.message_id,
+                parse_mode: 'Markdown'
+            }
+        );
+        
+        // Send to each user with proper media handling
+        for (let i = 0; i < users.length; i++) {
+            const user = users[i];
+            const targetId = user._id;
+            
             try {
-                const targetId = user._id;
-                
+                // ===== SEND BASED ON MESSAGE TYPE =====
                 switch (messageType) {
                     case 'text':
-                        await bot.sendMessage(targetId, `📢 **BROADCAST**\n\n${msg.text}`, { parse_mode: 'Markdown' });
+                        await bot.sendMessage(targetId, `📢 **BROADCAST**\n\n${msg.text}`, { 
+                            parse_mode: 'Markdown',
+                            disable_web_page_preview: true 
+                        });
                         break;
+                        
                     case 'photo':
                         await bot.sendPhoto(targetId, mediaId, { 
-                            caption: caption || '📢 **BROADCAST**',
+                            caption: caption ? `📢 **BROADCAST**\n\n${caption}` : '📢 **BROADCAST**',
                             parse_mode: 'Markdown'
                         });
                         break;
+                        
                     case 'video':
                         await bot.sendVideo(targetId, mediaId, { 
-                            caption: caption || '📢 **BROADCAST**',
+                            caption: caption ? `📢 **BROADCAST**\n\n${caption}` : '📢 **BROADCAST**',
                             parse_mode: 'Markdown'
                         });
                         break;
+                        
                     case 'document':
                         await bot.sendDocument(targetId, mediaId, { 
-                            caption: caption || '📢 **BROADCAST**',
+                            caption: caption ? `📢 **BROADCAST**\n\n${caption}` : '📢 **BROADCAST**',
                             parse_mode: 'Markdown'
                         });
                         break;
+                        
                     case 'audio':
                         await bot.sendAudio(targetId, mediaId, { 
-                            caption: caption || '📢 **BROADCAST**',
+                            caption: caption ? `📢 **BROADCAST**\n\n${caption}` : '📢 **BROADCAST**',
                             parse_mode: 'Markdown'
                         });
                         break;
+                        
                     case 'voice':
                         await bot.sendVoice(targetId, mediaId, { 
-                            caption: caption || '📢 **BROADCAST**',
+                            caption: caption ? `📢 **BROADCAST**\n\n${caption}` : '📢 **BROADCAST**',
                             parse_mode: 'Markdown'
                         });
                         break;
+                        
                     case 'sticker':
                         await bot.sendSticker(targetId, mediaId);
                         break;
+                        
                     case 'animation':
                         await bot.sendAnimation(targetId, mediaId, { 
-                            caption: caption || '📢 **BROADCAST**',
+                            caption: caption ? `📢 **BROADCAST**\n\n${caption}` : '📢 **BROADCAST**',
                             parse_mode: 'Markdown'
                         });
                         break;
+                        
                     case 'video_note':
                         await bot.sendVideoNote(targetId, mediaId);
                         break;
+                        
                     case 'poll':
                         await bot.sendPoll(
                             targetId,
                             msg.poll.question,
                             msg.poll.options.map(o => o.text),
-                            { is_anonymous: msg.poll.is_anonymous }
+                            { 
+                                is_anonymous: msg.poll.is_anonymous,
+                                type: msg.poll.type,
+                                allows_multiple_answers: msg.poll.allows_multiple_answers
+                            }
                         );
                         break;
+                        
                     case 'location':
                         await bot.sendLocation(targetId, msg.location.latitude, msg.location.longitude);
                         break;
+                        
                     case 'contact':
-                        await bot.sendContact(targetId, msg.contact.phone_number, msg.contact.first_name);
+                        await bot.sendContact(targetId, msg.contact.phone_number, msg.contact.first_name, {
+                            last_name: msg.contact.last_name || '',
+                            vcard: msg.contact.vcard || ''
+                        });
                         break;
+                        
                     case 'game':
                         await bot.sendGame(targetId, msg.game.short_name);
                         break;
+                        
                     default:
+                        // Fallback: use forwardMessage for unknown types
                         await bot.forwardMessage(targetId, chatId, msg.message_id);
                 }
                 success++;
             } catch (error) {
                 if (error.message && error.message.includes('bot was blocked')) {
                     blocked++;
+                } else if (error.message && error.message.includes('chat not found')) {
+                    blocked++;
                 } else {
                     fail++;
+                    console.error(`Failed to send to ${targetId}:`, error.message);
                 }
             }
-        }));
-        
-        // Update progress
-        const processed = Math.min(i + batchSize, totalUsers);
-        const progress = Math.round((processed / totalUsers) * 100);
-        const elapsed = Math.floor((Date.now() - startTime) / 1000);
-        
-        if (progress % 10 === 0 || processed === totalUsers) {
-            try {
-                await bot.editMessageText(
-                    `📢 **BROADCASTING...**\n\n` +
-                    `📊 **Total Users:** ${totalUsers}\n` +
-                    `✅ Success: ${success}\n` +
-                    `❌ Failed: ${fail}\n` +
-                    `🚫 Blocked: ${blocked}\n` +
-                    `⏳ Progress: ${progress}%\n` +
-                    `⏱️ Elapsed: ${elapsed}s\n` +
-                    `📎 Type: ${messageType.toUpperCase()}`,
-                    {
-                        chat_id: chatId,
-                        message_id: processingMsg.message_id,
-                        parse_mode: 'Markdown'
-                    }
-                );
-            } catch (e) {}
+            
+            // Update progress every 5 users
+            if ((i + 1) % 5 === 0 || i === users.length - 1) {
+                const processed = i + 1;
+                const progress = Math.round((processed / totalUsers) * 100);
+                const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                
+                try {
+                    await bot.editMessageText(
+                        `📢 **BROADCASTING...**\n\n` +
+                        `📊 **Total Users:** ${totalUsers}\n` +
+                        `✅ Success: ${success}\n` +
+                        `❌ Failed: ${fail}\n` +
+                        `🚫 Blocked: ${blocked}\n` +
+                        `⏳ Progress: ${progress}%\n` +
+                        `⏱️ Elapsed: ${elapsed}s\n` +
+                        `📎 Type: ${messageType.toUpperCase()}`,
+                        {
+                            chat_id: chatId,
+                            message_id: processingMsg.message_id,
+                            parse_mode: 'Markdown'
+                        }
+                    );
+                } catch (e) {
+                    // Ignore edit errors
+                }
+            }
+            
+            // Small delay to avoid rate limits
+            await new Promise(r => setTimeout(r, 50));
         }
         
-        await new Promise(r => setTimeout(r, 100));
+        // ===== BROADCAST COMPLETE =====
+        const totalTime = Math.floor((Date.now() - startTime) / 1000);
+        const successRate = totalUsers - blocked > 0 ? Math.round((success / (totalUsers - blocked)) * 100) : 0;
+        
+        await bot.editMessageText(
+            `✅ **BROADCAST COMPLETED!**\n\n` +
+            `📊 **Total Users:** ${totalUsers}\n` +
+            `✅ **Success:** ${success}\n` +
+            `❌ **Failed:** ${fail}\n` +
+            `🚫 **Blocked:** ${blocked}\n` +
+            `📈 **Success Rate:** ${successRate}%\n` +
+            `⏱️ **Time Taken:** ${totalTime}s\n` +
+            `📎 **Message Type:** ${messageType.toUpperCase()}\n\n` +
+            `🔄 Use /broadcast to send another broadcast`,
+            {
+                chat_id: chatId,
+                message_id: processingMsg.message_id,
+                parse_mode: 'Markdown'
+            }
+        );
+        
+        // Store last broadcast info
+        const state = adminBroadcastState.get(chatId) || {};
+        state.last_broadcast = new Date().toLocaleString();
+        state.success_count = success;
+        state.fail_count = fail;
+        state.blocked_count = blocked;
+        adminBroadcastState.set(chatId, state);
+        
+        console.log(`📢 Broadcast completed: ${success}/${totalUsers} users, ${totalTime}s, Type: ${messageType}`);
+        
+    } catch (error) {
+        console.error('Broadcast error:', error);
+        bot.sendMessage(chatId, `❌ Broadcast failed: ${error.message}`);
+    } finally {
+        adminBroadcastState.delete(chatId);
     }
-    
-    // Complete
-    const totalTime = Math.floor((Date.now() - startTime) / 1000);
-    const successRate = totalUsers - blocked > 0 ? Math.round((success / (totalUsers - blocked)) * 100) : 0;
-    
-    await bot.editMessageText(
-        `✅ **BROADCAST COMPLETED!**\n\n` +
-        `📊 **Total Users:** ${totalUsers}\n` +
-        `✅ **Success:** ${success}\n` +
-        `❌ **Failed:** ${fail}\n` +
-        `🚫 **Blocked:** ${blocked}\n` +
-        `📈 **Success Rate:** ${successRate}%\n` +
-        `⏱️ **Time Taken:** ${totalTime}s\n` +
-        `📎 **Message Type:** ${messageType.toUpperCase()}\n\n` +
-        `🔄 Use /broadcast to send another broadcast`,
-        {
-            chat_id: chatId,
-            message_id: processingMsg.message_id,
-            parse_mode: 'Markdown'
-        }
-    );
-    
-    adminBroadcastState.delete(chatId);
-    console.log(`📢 Broadcast completed: ${success}/${totalUsers} users, ${totalTime}s, Type: ${messageType}`);
 }
 
 // ---------- ERROR HANDLING ----------
