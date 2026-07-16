@@ -1,4 +1,4 @@
-// bot.js – Complete OTP Bomber with ALL APIs and ALL Working Buttons (FIXED)
+// bot.js – Complete OTP Bomber with ALL APIs (BROADCAST + QR FIXED)
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const { BOT_TOKEN, ADMIN_IDS } = require('./config');
@@ -45,7 +45,7 @@ const BATCH_DELAY = 15;
 const MAX_RETRIES = 2;
 const API_TIMEOUT = 2500;
 
-// ===== QR CODE PATH (DECLARED ONLY ONCE) =====
+// ===== QR CODE PATH =====
 let qrCodePath = path.join(__dirname, 'qr_code.jpg');
 let qrCodeSet = false;
 
@@ -2176,6 +2176,292 @@ async function handlePaymentScreenshot(chatId, msg) {
 }
 
 // ============================================================
+// ===== QR CODE SET HANDLER (FIXED) =====
+// ============================================================
+
+async function handleSetQRCode(chatId, msg) {
+    if (!ADMIN_IDS.includes(Number(chatId))) {
+        return bot.sendMessage(chatId, '❌ Admin only!');
+    }
+
+    // Check if photo is sent
+    if (!msg.photo) {
+        return bot.sendMessage(chatId, '📸 **Please send a photo to set as QR code.**\n\nSend any image that will be shown to users when they buy credits.', { parse_mode: 'Markdown' });
+    }
+
+    try {
+        const photo = msg.photo[msg.photo.length - 1];
+        const file = await bot.getFile(photo.file_id);
+        const url = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
+        
+        // Download and save QR code
+        const response = await axios({ url, responseType: 'stream' });
+        const writer = fs.createWriteStream(qrCodePath);
+        response.data.pipe(writer);
+        
+        writer.on('finish', () => {
+            qrCodeSet = true;
+            bot.sendMessage(chatId, '✅ **QR Code saved successfully!**\n\nUsers will now see this QR code when buying credits.', { parse_mode: 'Markdown' });
+        });
+        
+        writer.on('error', (err) => {
+            bot.sendMessage(chatId, `❌ Failed to save QR code: ${err.message}`);
+        });
+        
+        // Clear state
+        userStates.delete(chatId);
+        
+    } catch (error) {
+        bot.sendMessage(chatId, `❌ Error: ${error.message}`);
+    }
+}
+
+// ============================================================
+// ===== BROADCAST SYSTEM (FIXED - ALL MEDIA TYPES) =====
+// ============================================================
+
+async function handleBroadcast(chatId, msg) {
+    try {
+        // Get all users
+        const users = await db.User.find().select('_id');
+        const totalUsers = users.length;
+        
+        if (totalUsers === 0) {
+            return bot.sendMessage(chatId, '❌ No users found in database!');
+        }
+        
+        // Show processing message
+        const processingMsg = await bot.sendMessage(
+            chatId,
+            `📢 **Broadcasting to ${totalUsers} users...**\n\n⏳ Please wait...`,
+            { parse_mode: 'Markdown' }
+        );
+        
+        // ===== DETECT MESSAGE TYPE =====
+        let messageType = 'text';
+        let mediaId = null;
+        let caption = msg.caption || '';
+        
+        // Check ALL media types
+        if (msg.photo) {
+            messageType = 'photo';
+            mediaId = msg.photo[msg.photo.length - 1].file_id;
+            caption = msg.caption || '';
+        } else if (msg.video) {
+            messageType = 'video';
+            mediaId = msg.video.file_id;
+            caption = msg.caption || '';
+        } else if (msg.document) {
+            messageType = 'document';
+            mediaId = msg.document.file_id;
+            caption = msg.caption || '';
+        } else if (msg.audio) {
+            messageType = 'audio';
+            mediaId = msg.audio.file_id;
+            caption = msg.caption || '';
+        } else if (msg.voice) {
+            messageType = 'voice';
+            mediaId = msg.voice.file_id;
+            caption = msg.caption || '';
+        } else if (msg.sticker) {
+            messageType = 'sticker';
+            mediaId = msg.sticker.file_id;
+        } else if (msg.animation) {
+            messageType = 'animation';
+            mediaId = msg.animation.file_id;
+            caption = msg.caption || '';
+        } else if (msg.video_note) {
+            messageType = 'video_note';
+            mediaId = msg.video_note.file_id;
+        } else if (msg.poll) {
+            messageType = 'poll';
+        } else if (msg.location) {
+            messageType = 'location';
+        } else if (msg.contact) {
+            messageType = 'contact';
+        } else if (msg.game) {
+            messageType = 'game';
+        } else if (msg.text) {
+            messageType = 'text';
+        }
+        
+        // ===== START BROADCAST =====
+        let success = 0, fail = 0, blocked = 0;
+        const startTime = Date.now();
+        const BATCH_SIZE_BROADCAST = 3;
+        
+        // Send to each user with proper media handling
+        for (let i = 0; i < users.length; i++) {
+            const user = users[i];
+            const targetId = user._id;
+            
+            try {
+                // Send based on message type
+                switch (messageType) {
+                    case 'text':
+                        await bot.sendMessage(targetId, 
+                            `📢 **BROADCAST**\n\n${msg.text}`, 
+                            { parse_mode: 'Markdown', disable_web_page_preview: true }
+                        );
+                        break;
+                        
+                    case 'photo':
+                        await bot.sendPhoto(targetId, mediaId, { 
+                            caption: caption ? `📢 **BROADCAST**\n\n${caption}` : '📢 **BROADCAST**',
+                            parse_mode: 'Markdown'
+                        });
+                        break;
+                        
+                    case 'video':
+                        await bot.sendVideo(targetId, mediaId, { 
+                            caption: caption ? `📢 **BROADCAST**\n\n${caption}` : '📢 **BROADCAST**',
+                            parse_mode: 'Markdown'
+                        });
+                        break;
+                        
+                    case 'document':
+                        await bot.sendDocument(targetId, mediaId, { 
+                            caption: caption ? `📢 **BROADCAST**\n\n${caption}` : '📢 **BROADCAST**',
+                            parse_mode: 'Markdown'
+                        });
+                        break;
+                        
+                    case 'audio':
+                        await bot.sendAudio(targetId, mediaId, { 
+                            caption: caption ? `📢 **BROADCAST**\n\n${caption}` : '📢 **BROADCAST**',
+                            parse_mode: 'Markdown'
+                        });
+                        break;
+                        
+                    case 'voice':
+                        await bot.sendVoice(targetId, mediaId, { 
+                            caption: caption ? `📢 **BROADCAST**\n\n${caption}` : '📢 **BROADCAST**',
+                            parse_mode: 'Markdown'
+                        });
+                        break;
+                        
+                    case 'sticker':
+                        await bot.sendSticker(targetId, mediaId);
+                        break;
+                        
+                    case 'animation':
+                        await bot.sendAnimation(targetId, mediaId, { 
+                            caption: caption ? `📢 **BROADCAST**\n\n${caption}` : '📢 **BROADCAST**',
+                            parse_mode: 'Markdown'
+                        });
+                        break;
+                        
+                    case 'video_note':
+                        await bot.sendVideoNote(targetId, mediaId);
+                        break;
+                        
+                    case 'poll':
+                        await bot.sendPoll(
+                            targetId,
+                            msg.poll.question,
+                            msg.poll.options.map(o => o.text),
+                            { 
+                                is_anonymous: msg.poll.is_anonymous,
+                                type: msg.poll.type,
+                                allows_multiple_answers: msg.poll.allows_multiple_answers
+                            }
+                        );
+                        break;
+                        
+                    case 'location':
+                        await bot.sendLocation(targetId, msg.location.latitude, msg.location.longitude);
+                        break;
+                        
+                    case 'contact':
+                        await bot.sendContact(targetId, msg.contact.phone_number, msg.contact.first_name, {
+                            last_name: msg.contact.last_name || '',
+                            vcard: msg.contact.vcard || ''
+                        });
+                        break;
+                        
+                    case 'game':
+                        await bot.sendGame(targetId, msg.game.short_name);
+                        break;
+                        
+                    default:
+                        // Fallback: use forwardMessage for unknown types
+                        await bot.forwardMessage(targetId, chatId, msg.message_id);
+                }
+                success++;
+            } catch (error) {
+                if (error.message && error.message.includes('bot was blocked')) {
+                    blocked++;
+                } else if (error.message && error.message.includes('chat not found')) {
+                    blocked++;
+                } else {
+                    fail++;
+                    console.error(`Failed to send to ${targetId}:`, error.message);
+                }
+            }
+            
+            // Update progress every 3 users
+            if ((i + 1) % BATCH_SIZE_BROADCAST === 0 || i === users.length - 1) {
+                const processed = i + 1;
+                const progress = Math.round((processed / totalUsers) * 100);
+                const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                
+                try {
+                    await bot.editMessageText(
+                        `📢 **BROADCASTING...**\n\n` +
+                        `📊 Total Users: ${totalUsers}\n` +
+                        `✅ Success: ${success}\n` +
+                        `❌ Failed: ${fail}\n` +
+                        `🚫 Blocked: ${blocked}\n` +
+                        `⏳ Progress: ${progress}%\n` +
+                        `⏱️ Elapsed: ${elapsed}s\n` +
+                        `📎 Type: ${messageType.toUpperCase()}`,
+                        {
+                            chat_id: chatId,
+                            message_id: processingMsg.message_id,
+                            parse_mode: 'Markdown'
+                        }
+                    );
+                } catch (e) {
+                    // Ignore edit errors
+                }
+            }
+            
+            // Small delay to avoid rate limits
+            await new Promise(r => setTimeout(r, 50));
+        }
+        
+        // ===== BROADCAST COMPLETE =====
+        const totalTime = Math.floor((Date.now() - startTime) / 1000);
+        const successRate = totalUsers - blocked > 0 ? Math.round((success / (totalUsers - blocked)) * 100) : 0;
+        
+        await bot.editMessageText(
+            `✅ **BROADCAST COMPLETED!**\n\n` +
+            `📊 Total Users: ${totalUsers}\n` +
+            `✅ Success: ${success}\n` +
+            `❌ Failed: ${fail}\n` +
+            `🚫 Blocked: ${blocked}\n` +
+            `📈 Success Rate: ${successRate}%\n` +
+            `⏱️ Time Taken: ${totalTime}s\n` +
+            `📎 Message Type: ${messageType.toUpperCase()}\n\n` +
+            `🔄 Use /broadcast to send another broadcast`,
+            {
+                chat_id: chatId,
+                message_id: processingMsg.message_id,
+                parse_mode: 'Markdown'
+            }
+        );
+        
+        console.log(`📢 Broadcast completed: ${success}/${totalUsers} users, ${totalTime}s, Type: ${messageType}`);
+        
+    } catch (error) {
+        console.error('Broadcast error:', error);
+        bot.sendMessage(chatId, `❌ Broadcast failed: ${error.message}`);
+    } finally {
+        adminBroadcastState.delete(chatId);
+    }
+}
+
+// ============================================================
 // ===== COMMAND HANDLERS =====
 // ============================================================
 
@@ -2240,11 +2526,25 @@ async function showMainMenu(chatId) {
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const text = msg.text;
-    if (!text) return;
-
+    
     if (await db.isBanned(chatId)) return bot.sendMessage(chatId, '🚫 You are banned!');
 
     const user = await db.getUser(chatId);
+
+    // ===== SMART BROADCAST MESSAGE HANDLER =====
+    if (adminBroadcastState.has(chatId) && ADMIN_IDS.includes(Number(chatId))) {
+        const state = adminBroadcastState.get(chatId);
+        if (state && state.active) {
+            // Cancel broadcast
+            if (text === '/cancel' || text === 'Cancel' || text === '❌ Cancel') {
+                adminBroadcastState.delete(chatId);
+                return bot.sendMessage(chatId, '❌ Broadcast cancelled.');
+            }
+            // Process broadcast (handles all media types)
+            await handleBroadcast(chatId, msg);
+            return;
+        }
+    }
 
     // ===== PAYMENT SCREENSHOT HANDLER =====
     const state = userStates.get(chatId);
@@ -2253,38 +2553,19 @@ bot.on('message', async (msg) => {
         return;
     }
 
-    // ===== ADMIN: SET QR CODE =====
+    // ===== ADMIN: SET QR CODE (FIXED) =====
     if (text === '📸 SET QR CODE') {
         if (!ADMIN_IDS.includes(Number(chatId))) {
             return bot.sendMessage(chatId, '❌ Admin only!');
         }
-        bot.sendMessage(chatId, '📸 **Send QR Code Photo**\n\nSend a photo to set as payment QR code.', { parse_mode: 'Markdown' });
+        bot.sendMessage(chatId, '📸 **Send QR Code Photo**\n\nSend a photo to set as payment QR code.\nThis will be shown to users when they buy credits.', { parse_mode: 'Markdown' });
         userStates.set(chatId, { state: 'set_qr' });
         return;
     }
 
-    // ===== QR CODE SET HANDLER =====
+    // ===== QR CODE SET HANDLER (FIXED - GIVES RESPONSE) =====
     if (state && state.state === 'set_qr' && msg.photo) {
-        const photo = msg.photo[msg.photo.length - 1];
-        try {
-            const file = await bot.getFile(photo.file_id);
-            const url = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
-            
-            const response = await axios({ url, responseType: 'stream' });
-            const writer = fs.createWriteStream(qrCodePath);
-            response.data.pipe(writer);
-            
-            writer.on('finish', () => {
-                qrCodeSet = true;
-                bot.sendMessage(chatId, '✅ **QR Code set successfully!**', { parse_mode: 'Markdown' });
-            });
-            writer.on('error', () => {
-                bot.sendMessage(chatId, '❌ Failed to save QR code.');
-            });
-            userStates.delete(chatId);
-        } catch (error) {
-            bot.sendMessage(chatId, `❌ Error: ${error.message}`);
-        }
+        await handleSetQRCode(chatId, msg);
         return;
     }
 
@@ -2513,7 +2794,7 @@ bot.on('message', async (msg) => {
                     [{ text: '❌ Cancel', callback_data: 'smart_broadcast_cancel' }]
                 ]
             };
-            bot.sendMessage(chatId, '📢 **Broadcast System**\n\nSend message to all users.', 
+            bot.sendMessage(chatId, '📢 **Broadcast System**\n\nSend any message (text, photo, video, GIF, etc.) to all users.', 
                 { parse_mode: 'Markdown', reply_markup: keyboard });
             return;
         }
@@ -2895,7 +3176,7 @@ bot.on('callback_query', async (callbackQuery) => {
         }
         adminBroadcastState.set(chatId, { mode: 'broadcast', active: true });
         bot.editMessageText(
-            `📢 **Broadcast Mode Activated**\n\nSend any message and I'll forward it to ALL users!\n\nSend /cancel to exit.`,
+            `📢 **Broadcast Mode Activated**\n\nSend any message (text, photo, video, GIF, etc.) and I'll forward it to ALL users!\n\nSend /cancel to exit.`,
             { chat_id: chatId, message_id: msgId }
         );
         bot.answerCallbackQuery(callbackQuery.id, { text: '✅ Broadcast mode activated!' });
@@ -3024,72 +3305,6 @@ bot.on('callback_query', async (callbackQuery) => {
 });
 
 // ============================================================
-// ===== BROADCAST PROCESSING =====
-// ============================================================
-
-async function processSmartBroadcast(chatId, msg) {
-    try {
-        const users = await db.User.find().select('_id');
-        const totalUsers = users.length;
-        
-        if (totalUsers === 0) {
-            return bot.sendMessage(chatId, '❌ No users found!');
-        }
-        
-        const processingMsg = await bot.sendMessage(chatId, `⏳ Broadcasting to ${totalUsers} users...`);
-        
-        let success = 0, fail = 0, blocked = 0;
-        const startTime = Date.now();
-        
-        for (let i = 0; i < users.length; i++) {
-            const targetId = users[i]._id;
-            try {
-                await bot.forwardMessage(targetId, chatId, msg.message_id);
-                success++;
-            } catch (error) {
-                if (error.message && error.message.includes('bot was blocked')) {
-                    blocked++;
-                } else {
-                    fail++;
-                }
-            }
-            
-            if ((i + 1) % 10 === 0 || i === users.length - 1) {
-                const progress = Math.round(((i + 1) / totalUsers) * 100);
-                try {
-                    await bot.editMessageText(
-                        `📢 **Broadcasting...**\n\n` +
-                        `✅ Success: ${success}\n` +
-                        `❌ Failed: ${fail}\n` +
-                        `🚫 Blocked: ${blocked}\n` +
-                        `⏳ Progress: ${progress}%`,
-                        { chat_id: chatId, message_id: processingMsg.message_id, parse_mode: 'Markdown' }
-                    );
-                } catch (e) {}
-            }
-            
-            await new Promise(r => setTimeout(r, 50));
-        }
-        
-        const totalTime = Math.floor((Date.now() - startTime) / 1000);
-        await bot.editMessageText(
-            `✅ **Broadcast Completed!**\n\n` +
-            `📊 Total: ${totalUsers}\n` +
-            `✅ Success: ${success}\n` +
-            `❌ Failed: ${fail}\n` +
-            `🚫 Blocked: ${blocked}\n` +
-            `⏱️ Time: ${totalTime}s`,
-            { chat_id: chatId, message_id: processingMsg.message_id, parse_mode: 'Markdown' }
-        );
-        
-    } catch (error) {
-        bot.sendMessage(chatId, `❌ Broadcast failed: ${error.message}`);
-    } finally {
-        adminBroadcastState.delete(chatId);
-    }
-}
-
-// ============================================================
 // ===== HEALTH CHECK SERVER =====
 // ============================================================
 
@@ -3153,3 +3368,4 @@ console.log(`✅ Loaded ${uniqueApis.length} unique APIs`);
 console.log(`💰 Unlimited plan cost: 100 coins`);
 console.log(`📸 QR Code payment system enabled!`);
 console.log(`💳 Screenshot approval system enabled!`);
+console.log(`📢 Broadcast system supports: Text, Photo, Video, GIF, Document, Audio, Sticker, and more!`);
