@@ -1,4 +1,4 @@
-// bot.js – Complete OTP Bomber with ALL APIs and ALL Working Buttons
+// bot.js – Complete OTP Bomber with ALL APIs and ALL Working Buttons (FIXED)
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const { BOT_TOKEN, ADMIN_IDS } = require('./config');
@@ -45,12 +45,12 @@ const BATCH_DELAY = 15;
 const MAX_RETRIES = 2;
 const API_TIMEOUT = 2500;
 
-// ===== QR CODE PATH =====
+// ===== QR CODE PATH (DECLARED ONLY ONCE) =====
 let qrCodePath = path.join(__dirname, 'qr_code.jpg');
 let qrCodeSet = false;
 
 // ============================================================
-// ===== ALL API CONFIGURATIONS (FULL) =====
+// ===== ALL API CONFIGURATIONS =====
 // ============================================================
 
 const API_CONFIGS = [
@@ -1758,10 +1758,9 @@ for (const api of uniqueApis) {
 console.log(`✅ Loaded ${uniqueApis.length} unique APIs`);
 
 // ============================================================
-// ===== REST OF THE CODE (BOMBING ENGINE, KEYBOARDS, ETC.) =====
+// ===== BOMBING ENGINE =====
 // ============================================================
 
-// ===== BOMBING ENGINE =====
 function makeFallbackData(phone, apiName) {
     const lower = apiName.toLowerCase();
     if (lower.includes('voice') || lower.includes('call')) {
@@ -2075,9 +2074,6 @@ const PAYMENT_PLANS = {
     '100': { credits: 100, price: 120, label: '100 Credits – ₹120' },
     'unlimited': { credits: 0, price: 150, label: '⭐ 1 Day Unlimited – ₹150' }
 };
-
-let qrCodeSet = false;
-let qrCodePath = path.join(__dirname, 'qr_code.jpg');
 
 async function handleBuyCredits(chatId, planKey) {
     const plan = PAYMENT_PLANS[planKey];
@@ -2435,6 +2431,7 @@ bot.on('message', async (msg) => {
 
     // ===== ADMIN COMMANDS =====
     if (ADMIN_IDS.includes(Number(chatId))) {
+        // ===== STATS =====
         if (text === '📊 STATS') {
             const totalUsers = await db.User.countDocuments();
             const totalAttacks = (await db.User.aggregate([{ $group: { _id: null, total: { $sum: '$total_attacks' } } }]))[0]?.total || 0;
@@ -2448,6 +2445,67 @@ bot.on('message', async (msg) => {
             return;
         }
 
+        // ===== USERS LIST =====
+        if (text === '👥 USERS LIST') {
+            const users = await db.User.find().select('_id username credits total_attacks').limit(20);
+            let list = '👥 Users (first 20):\n\n';
+            users.forEach(u => {
+                list += `🆔 ${u._id} | @${u.username || 'no_username'} | 💰${u.credits} | 💥${u.total_attacks}\n`;
+            });
+            bot.sendMessage(chatId, list);
+            return;
+        }
+
+        // ===== GEN CODE =====
+        if (text === '🎟️ GEN CODE') {
+            userStates.set(chatId, { state: 'gen_code' });
+            bot.sendMessage(chatId, '💰 Send amount for the redeem code (max 1000):');
+            return;
+        }
+
+        // ===== BAN USER =====
+        if (text === '🚫 BAN USER') {
+            userStates.set(chatId, { state: 'ban_user' });
+            bot.sendMessage(chatId, '🚫 Send user ID to ban:');
+            return;
+        }
+
+        // ===== UNBAN USER =====
+        if (text === '✅ UNBAN USER') {
+            userStates.set(chatId, { state: 'unban_user' });
+            bot.sendMessage(chatId, '✅ Send user ID to unban:');
+            return;
+        }
+
+        // ===== ADD CREDITS =====
+        if (text === '💰 ADD CREDITS') {
+            userStates.set(chatId, { state: 'add_credits' });
+            bot.sendMessage(chatId, '💰 Send user ID:');
+            return;
+        }
+
+        // ===== ADD PROTECTED =====
+        if (text === '➕ ADD PROTECTED') {
+            userStates.set(chatId, { state: 'add_protected' });
+            bot.sendMessage(chatId, '🛡️ Send 10-digit number to protect:');
+            return;
+        }
+
+        // ===== REMOVE PROTECTED =====
+        if (text === '➖ REMOVE PROTECTED') {
+            userStates.set(chatId, { state: 'remove_protected' });
+            bot.sendMessage(chatId, '❌ Send 10-digit number to unprotect:');
+            return;
+        }
+
+        // ===== PROTECTED LIST =====
+        if (text === '📋 PROTECTED LIST') {
+            const list = await db.getProtected();
+            bot.sendMessage(chatId, `🛡️ **Protected Numbers**\n${list.length ? list.join('\n') : 'None'}`);
+            return;
+        }
+
+        // ===== BROADCAST =====
         if (text === '📢 BROADCAST') {
             const keyboard = {
                 inline_keyboard: [
@@ -2460,7 +2518,69 @@ bot.on('message', async (msg) => {
             return;
         }
 
-        // ... other admin commands (ban, unban, add credits, protected, etc.)
+        // ===== ALL USERS =====
+        if (text === '📋 ALL USERS') {
+            const users = await db.User.find().select('_id username credits');
+            let page = 0;
+            const perPage = 15;
+            const totalPages = Math.ceil(users.length / perPage);
+            const sendPage = async (pageNum) => {
+                const start = pageNum * perPage;
+                const end = start + perPage;
+                const chunk = users.slice(start, end);
+                let msg = '👥 **ALL USERS**\n\n';
+                chunk.forEach(u => {
+                    msg += `🆔 \`${u._id}\` | @${u.username || 'no_username'} | 💰${u.credits}\n`;
+                });
+                msg += `\nPage ${pageNum+1}/${totalPages}`;
+                const markup = totalPages > 1 ? {
+                    inline_keyboard: [
+                        ...(pageNum > 0 ? [{ text: '◀️ Prev', callback_data: `allusers_${pageNum-1}` }] : []),
+                        ...(pageNum < totalPages-1 ? [{ text: 'Next ▶️', callback_data: `allusers_${pageNum+1}` }] : [])
+                    ]
+                } : undefined;
+                return bot.sendMessage(chatId, msg, { parse_mode: 'Markdown', reply_markup: markup });
+            };
+            await sendPage(0);
+            userStates.set(chatId, { state: 'allusers', users, page: 0, perPage, totalPages });
+            return;
+        }
+
+        // ===== UNLIMITED PLAN =====
+        if (text === '🔄 UNLIMITED PLAN') {
+            userStates.set(chatId, { state: 'unlimited_plan' });
+            bot.sendMessage(chatId, '⭐ Send user ID to grant 1-day unlimited bombing plan:');
+            return;
+        }
+
+        // ===== CHANNEL MANAGER =====
+        if (text === '📺 CHANNEL MANAGER') {
+            const keyboard = {
+                inline_keyboard: [
+                    [{ text: '➕ Add Channel', callback_data: 'channel_add' }],
+                    [{ text: '➖ Remove Channel', callback_data: 'channel_remove' }],
+                    [{ text: '📋 View Channels', callback_data: 'channel_view' }],
+                    [{ text: '🔙 Back to Admin', callback_data: 'admin_back' }]
+                ]
+            };
+            bot.sendMessage(chatId, '📺 **Channel Manager**\n\nManage required channels.', { reply_markup: keyboard });
+            return;
+        }
+
+        // ===== SCANNER MANAGER =====
+        if (text === '🛡️ SCANNER MANAGER') {
+            const keyboard = {
+                inline_keyboard: [
+                    [{ text: '➕ Add Scanner', callback_data: 'scanner_add' }],
+                    [{ text: '➖ Remove Scanner', callback_data: 'scanner_remove' }],
+                    [{ text: '📋 View Scanners', callback_data: 'scanner_view' }],
+                    [{ text: '🔄 Set Global Headers', callback_data: 'scanner_headers' }],
+                    [{ text: '🔙 Back to Admin', callback_data: 'admin_back' }]
+                ]
+            };
+            bot.sendMessage(chatId, '🛡️ **Scanner Manager**\n\nManage scanner bypass configurations.', { reply_markup: keyboard });
+            return;
+        }
     }
 
     // ===== START BOMB =====
@@ -2493,7 +2613,7 @@ bot.on('message', async (msg) => {
         const state = userStates.get(chatId);
         const input = text.trim();
 
-        // Redeem code
+        // ===== REDEEM CODE =====
         if (state.state === 'redeem_code') {
             const amount = await db.getRedeemCode(input.toUpperCase());
             if (amount === null) {
@@ -2506,7 +2626,7 @@ bot.on('message', async (msg) => {
             return;
         }
 
-        // Enter phone
+        // ===== ENTER PHONE =====
         if (state.state === 'enter_phone') {
             const phone = input.replace(/\D/g, '');
             if (phone.length !== 10) return bot.sendMessage(chatId, '❌ Invalid number! Must be 10 digits.');
@@ -2523,7 +2643,38 @@ bot.on('message', async (msg) => {
             return;
         }
 
-        // Admin: Add credits
+        // ===== GEN CODE (ADMIN) =====
+        if (state.state === 'gen_code') {
+            const amount = parseInt(input);
+            if (isNaN(amount) || amount <= 0 || amount > 1000) return bot.sendMessage(chatId, '❌ Invalid amount. Max 1000.');
+            const code = 'RTF' + Math.random().toString(36).substring(2, 7).toUpperCase();
+            await db.createRedeemCode(code, amount);
+            bot.sendMessage(chatId, `✅ Code: \`${code}\`\nAmount: ${amount} credits`, { parse_mode: 'Markdown' });
+            userStates.delete(chatId);
+            return;
+        }
+
+        // ===== BAN USER (ADMIN) =====
+        if (state.state === 'ban_user') {
+            const id = parseInt(input);
+            if (isNaN(id)) return bot.sendMessage(chatId, '❌ Invalid ID.');
+            await db.banUser(id);
+            bot.sendMessage(chatId, `✅ Banned ${id}`);
+            userStates.delete(chatId);
+            return;
+        }
+
+        // ===== UNBAN USER (ADMIN) =====
+        if (state.state === 'unban_user') {
+            const id = parseInt(input);
+            if (isNaN(id)) return bot.sendMessage(chatId, '❌ Invalid ID.');
+            await db.unbanUser(id);
+            bot.sendMessage(chatId, `✅ Unbanned ${id}`);
+            userStates.delete(chatId);
+            return;
+        }
+
+        // ===== ADD CREDITS (ADMIN) =====
         if (state.state === 'add_credits') {
             const uid = parseInt(input);
             if (isNaN(uid)) return bot.sendMessage(chatId, '❌ Invalid ID.');
@@ -2540,8 +2691,38 @@ bot.on('message', async (msg) => {
             return;
         }
 
-        // Admin: Ban/Unban/Protected/etc.
-        // ... (add remaining admin state handlers)
+        // ===== ADD PROTECTED (ADMIN) =====
+        if (state.state === 'add_protected') {
+            if (!input.match(/^\d{10}$/)) return bot.sendMessage(chatId, '❌ Invalid number. Must be 10 digits.');
+            await db.addProtected(input);
+            bot.sendMessage(chatId, `✅ ${input} added to protected list.`);
+            userStates.delete(chatId);
+            return;
+        }
+
+        // ===== REMOVE PROTECTED (ADMIN) =====
+        if (state.state === 'remove_protected') {
+            if (!input.match(/^\d{10}$/)) return bot.sendMessage(chatId, '❌ Invalid number. Must be 10 digits.');
+            await db.removeProtected(input);
+            bot.sendMessage(chatId, `✅ ${input} removed from protected list.`);
+            userStates.delete(chatId);
+            return;
+        }
+
+        // ===== UNLIMITED PLAN (ADMIN) =====
+        if (state.state === 'unlimited_plan') {
+            const uid = parseInt(input);
+            if (isNaN(uid)) return bot.sendMessage(chatId, '❌ Invalid ID.');
+            const target = await db.getUser(uid);
+            target.daily_unlimited = Date.now() / 1000 + 86400;
+            await target.save();
+            bot.sendMessage(chatId, `✅ Unlimited plan granted to user ${uid} for 24 hours!`);
+            try {
+                await bot.sendMessage(uid, '⭐ **You\'ve been granted a 1-Day Unlimited Bombing Plan!**\n\nYou can now bomb any number for free for the next 24 hours!\nUse /bomb to start bombing.');
+            } catch (e) {}
+            userStates.delete(chatId);
+            return;
+        }
     }
 });
 
@@ -2728,6 +2909,116 @@ bot.on('callback_query', async (callbackQuery) => {
         adminBroadcastState.delete(chatId);
         bot.editMessageText('❌ Broadcast cancelled.', { chat_id: chatId, message_id: msgId });
         bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Cancelled' });
+        return;
+    }
+
+    // ===== CHANNEL MANAGER =====
+    if (data === 'channel_add') {
+        if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
+        userStates.set(chatId, { state: 'add_channel' });
+        bot.editMessageText('📺 Send channel username to add (e.g., @channelname):', { chat_id: chatId, message_id: msgId });
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+
+    if (data === 'channel_remove') {
+        if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
+        const channels = await db.getChannels();
+        if (channels.length === 0) {
+            bot.editMessageText('📭 No channels to remove.', { chat_id: chatId, message_id: msgId });
+            return bot.answerCallbackQuery(callbackQuery.id);
+        }
+        userStates.set(chatId, { state: 'remove_channel' });
+        let msg = '📺 **Current Channels:**\n' + channels.join('\n') + '\n\nSend channel username to remove:';
+        bot.editMessageText(msg, { chat_id: chatId, message_id: msgId });
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+
+    if (data === 'channel_view') {
+        if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
+        const channels = await db.getChannels();
+        const msg = channels.length ? `📺 **Required Channels:**\n${channels.join('\n')}` : '📭 No channels configured.';
+        bot.editMessageText(msg, { chat_id: chatId, message_id: msgId });
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+
+    // ===== SCANNER MANAGER =====
+    if (data === 'scanner_add') {
+        if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
+        userStates.set(chatId, { state: 'add_scanner' });
+        bot.editMessageText('🛡️ Send scanner bypass data (JSON format or description):', { chat_id: chatId, message_id: msgId });
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+
+    if (data === 'scanner_remove') {
+        if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
+        const config = await db.getScannerConfig();
+        if (config.scanners.length === 0) {
+            bot.editMessageText('📭 No scanners configured.', { chat_id: chatId, message_id: msgId });
+            return bot.answerCallbackQuery(callbackQuery.id);
+        }
+        let msg = '🛡️ **Current Scanners:**\n';
+        config.scanners.forEach((s, i) => msg += `${i+1}. ${s.substring(0, 50)}...\n`);
+        msg += '\nSend scanner number to remove:';
+        userStates.set(chatId, { state: 'remove_scanner' });
+        bot.editMessageText(msg, { chat_id: chatId, message_id: msgId });
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+
+    if (data === 'scanner_view') {
+        if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
+        const config = await db.getScannerConfig();
+        const msg = config.scanners.length ? `🛡️ **Configured Scanners:**\n\n${config.scanners.map((s, i) => `${i+1}. ${s}`).join('\n')}` : '📭 No scanners configured.';
+        bot.editMessageText(msg, { chat_id: chatId, message_id: msgId });
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+
+    if (data === 'scanner_headers') {
+        if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
+        userStates.set(chatId, { state: 'set_global_headers' });
+        bot.editMessageText('🔄 Send global headers in JSON format:\n`{"header1": "value1", "header2": "value2"}`', 
+            { chat_id: chatId, message_id: msgId, parse_mode: 'Markdown' });
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+
+    // ===== ADMIN BACK =====
+    if (data === 'admin_back') {
+        bot.editMessageText('🔐 Admin Panel', { chat_id: chatId, message_id: msgId });
+        bot.sendMessage(chatId, '🔐 Admin Panel', adminKeyboard());
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+
+    // ===== ALL USERS PAGINATION =====
+    if (data.startsWith('allusers_')) {
+        const page = parseInt(data.split('_')[1]);
+        const state = userStates.get(chatId);
+        if (state && state.state === 'allusers') {
+            const start = page * state.perPage;
+            const end = start + state.perPage;
+            const chunk = state.users.slice(start, end);
+            let msg = '👥 **ALL USERS**\n\n';
+            chunk.forEach(u => {
+                msg += `🆔 \`${u._id}\` | @${u.username || 'no_username'} | 💰${u.credits}\n`;
+            });
+            msg += `\nPage ${page+1}/${state.totalPages}`;
+            const markup = {
+                inline_keyboard: [
+                    ...(page > 0 ? [{ text: '◀️ Prev', callback_data: `allusers_${page-1}` }] : []),
+                    ...(page < state.totalPages-1 ? [{ text: 'Next ▶️', callback_data: `allusers_${page+1}` }] : [])
+                ]
+            };
+            bot.editMessageText(msg, { chat_id: chatId, message_id: msgId, parse_mode: 'Markdown', reply_markup: markup });
+            state.page = page;
+            userStates.set(chatId, state);
+        }
+        bot.answerCallbackQuery(callbackQuery.id);
         return;
     }
 });
