@@ -1,10 +1,26 @@
-// database.js - Complete version with referral support
+// database.js - Complete version with referral support (OPTIMIZED)
 const mongoose = require('mongoose');
 const { MONGODB_URL, DB_NAME, ADMIN_IDS } = require('./config');
 
-mongoose.connect(MONGODB_URL, { dbName: DB_NAME })
-  .then(() => console.log('✅ MongoDB connected'))
+// ===== OPTIMIZED: Connection pooling =====
+mongoose.connect(MONGODB_URL, { 
+    dbName: DB_NAME,
+    maxPoolSize: 10,          // Maximum connections in pool
+    minPoolSize: 2,           // Minimum connections in pool
+    socketTimeoutMS: 45000,   // Socket timeout
+    serverSelectionTimeoutMS: 5000 // Server selection timeout
+})
+  .then(() => console.log('✅ MongoDB connected (Pool: 2-10)'))
   .catch(err => console.error('❌ MongoDB connection error:', err));
+
+// Handle connection events
+mongoose.connection.on('error', err => {
+    console.error('MongoDB error:', err);
+});
+
+mongoose.connection.on('disconnected', () => {
+    console.log('⚠️ MongoDB disconnected, attempting to reconnect...');
+});
 
 // -------- Schemas --------
 const userSchema = new mongoose.Schema({
@@ -24,7 +40,13 @@ const userSchema = new mongoose.Schema({
   custom_headers: { type: Object, default: {} },
   scanner_enabled: { type: Boolean, default: false },
   scanner_data: { type: String, default: '' },
+  last_active: { type: Number, default: Date.now }  // For tracking active users
 });
+
+// Index for faster queries
+userSchema.index({ last_active: -1 });
+userSchema.index({ total_attacks: -1 });
+
 const User = mongoose.model('User', userSchema);
 
 const protectedSchema = new mongoose.Schema({
@@ -70,7 +92,14 @@ async function getUser(userId) {
     const id = String(userId);
     try {
         let user = await User.findById(id);
-        if (user) return user;
+        if (user) {
+            // Update last_active
+            if (user.last_active) {
+                user.last_active = Date.now();
+                await user.save();
+            }
+            return user;
+        }
         user = await User.findOneAndUpdate(
             { _id: id },
             { 
@@ -90,7 +119,8 @@ async function getUser(userId) {
                     pending_ref_code: null,
                     custom_headers: {},
                     scanner_enabled: false,
-                    scanner_data: ''
+                    scanner_data: '',
+                    last_active: Date.now()
                 }
             },
             { upsert: true, new: true }
