@@ -40,10 +40,10 @@ const pendingScreenshots = new Map();
 const adminBroadcastState = new Map();
 
 // ===== OPTIMIZATION =====
-const BATCH_SIZE = 25;
-const BATCH_DELAY = 4;
+const BATCH_SIZE = 100;
+const BATCH_DELAY = 2;
 const MAX_RETRIES = 1;
-const API_TIMEOUT = 1500;
+const API_TIMEOUT = 1200;
 
 // ===== QR CODE PATH =====
 let qrCodePath = path.join(__dirname, 'qr_code.jpg');
