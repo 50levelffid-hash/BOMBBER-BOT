@@ -1,5 +1,5 @@
 // ============================================================
-// bot.js – Main Telegram Bot with ALL Features + Load Balancer
+// bot.js – Complete OTP Bomber Bot with Load Balancing
 // ============================================================
 
 const TelegramBot = require('node-telegram-bot-api');
@@ -17,7 +17,6 @@ const BOT_TOKEN = "8212356485:AAGeN3peo9uHPG8eCLFRuWjs12hCVC-jNs4";
 const ADMIN_IDS = [6346250222];
 
 // ===== API URLS (YOUR 4 RENDER INSTANCES) =====
-// In dono URLs ko apne actual Render URLs se replace karein
 const API_URLS = {
     api1: 'https://api-server-padj.onrender.com',  // API Server 1
     api2: 'https://api-server-fy8w.onrender.com',  // API Server 2
@@ -323,7 +322,8 @@ let apiCycleCounter = 0;
 const API_NAMES = ['api1', 'api2', 'api3', 'api4'];
 
 function getApiForDuration(duration, cycleCount) {
-    // 1 minute: ALL APIs simultaneously for max speed    if (duration <= 1) {
+    // 1 minute: ALL APIs simultaneously for max speed
+    if (duration <= 1) {
         return ['api1', 'api2', 'api3', 'api4'];
     }
     // 2-5 minutes: API 1
@@ -1710,11 +1710,7 @@ app.listen(PORT, '0.0.0.0', () => {
 
 console.log('🤖 Bot started successfully!');
 console.log(`📡 Load Balancer: ACTIVE`);
-console.log(`🌐 API Instances:`);
-console.log(`   API 1: ${API_URLS.api1}`);
-console.log(`   API 2: ${API_URLS.api2}`);
-console.log(`   API 3: ${API_URLS.api3}`);
-console.log(`   API 4: ${API_URLS.api4}`);
+console.log(`🌐 API Instances: 4`);
 console.log(`📸 QR Code payment system: ${qrCodeSet ? '✅' : '❌'}`);
 console.log(`💳 Screenshot approval system: ✅`);
 console.log(`📢 Broadcast system: ✅`);
