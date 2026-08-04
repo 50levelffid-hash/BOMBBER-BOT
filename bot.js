@@ -21,7 +21,7 @@ const API_URLS = {
     api1: 'https://api-server-padj.onrender.com',  // API Server 1
     api2: 'https://api-server-fy8w.onrender.com',  // API Server 2
     api3: 'https://api-server-mey8.onrender.com',  // API Server 3
-    api4: 'https://api-server-0abv.onrender.com'   // API Server 4
+    api4: 'https://api-server-0abv.onrender.com',   // API Server 4
     api5: 'https://wasataap-call-api.onrender.com'   // API Server 5 - Voice & WhatsApp Only
 };
 
