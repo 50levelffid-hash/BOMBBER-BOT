@@ -678,7 +678,7 @@ function adminKeyboard() {
 }
 
 // ============================================================
-// ===== INLINE KEYBOARDS – FIXED =====
+// ===== INLINE KEYBOARDS – ALL FIXED =====
 // ============================================================
 
 // 1. DURATION BUTTONS (Bomb time selection)
@@ -894,7 +894,7 @@ async function handlePaymentScreenshot(chatId, msg) {
             await bot.sendPhoto(adminId, photo.file_id, {
                 caption: adminMsg,
                 parse_mode: 'Markdown',
-                reply_markup: approvalKeyboard
+                reply_markup: approvalKeyboard.reply_markup
             });
         } catch (e) {
             console.error(`Failed to send to admin ${adminId}:`, e.message);
@@ -1166,7 +1166,7 @@ bot.onText(/\/start/, async (msg) => {
             bot.sendMessage(
                 chatId,
                 `🚫 **Please join our channel(s) first!**\n\nRequired channels:\n${allChannels.join('\n')}\n${privateLinks.length > 0 ? '\n🔒 Private Channel Links:\n' + privateLinks.join('\n') : ''}\n\nAfter joining all channels, click the button below.`,
-                { parse_mode: 'Markdown', reply_markup: keyboard }
+                { parse_mode: 'Markdown', reply_markup: keyboard.reply_markup }
             );
         } else {
             await showMainMenu(chatId);
@@ -1212,7 +1212,11 @@ async function showMainMenu(chatId) {
     const inviteLink = `https://t.me/${botInfo.username}?start=${code}`;
     const fullMessage = welcomeText + `\n\n🔗 Your Referral Code: \`${code}\`\n📤 Share: ${inviteLink}`;
     
-    bot.sendMessage(chatId, fullMessage, { parse_mode: 'Markdown', ...mainKeyboard() });
+    const mainKb = mainKeyboard();
+    bot.sendMessage(chatId, fullMessage, { 
+        parse_mode: 'Markdown', 
+        reply_markup: mainKb.reply_markup 
+    });
 }
 
 // ============================================================
@@ -1380,7 +1384,10 @@ bot.on('message', async (msg) => {
     // ===== BUY CREDITS =====
     if (text === '💳 BUY CREDITS') {
         const keyboard = getPaymentButtons();
-        bot.sendMessage(chatId, '💳 **Choose a plan:**', { parse_mode: 'Markdown', reply_markup: keyboard });
+        bot.sendMessage(chatId, '💳 **Choose a plan:**', { 
+            parse_mode: 'Markdown', 
+            reply_markup: keyboard.reply_markup 
+        });
         return;
     }
 
@@ -1481,19 +1488,28 @@ bot.on('message', async (msg) => {
     // ===== SETTINGS =====
     if (text === '⚙️ SETTINGS') {
         const keyboard = getSettingsButtons();
-        bot.sendMessage(chatId, '⚙️ **Settings Panel**', { parse_mode: 'Markdown', reply_markup: keyboard });
+        bot.sendMessage(chatId, '⚙️ **Settings Panel**', { 
+            parse_mode: 'Markdown', 
+            reply_markup: keyboard.reply_markup 
+        });
         return;
     }
 
     // ===== ADMIN PANEL =====
     if (text === '👑 ADMIN PANEL') {
         if (!ADMIN_IDS.includes(Number(chatId))) return bot.sendMessage(chatId, '❌ You are not an admin.');
-        bot.sendMessage(chatId, '🔐 Admin Panel', adminKeyboard());
+        const adminKb = adminKeyboard();
+        bot.sendMessage(chatId, '🔐 Admin Panel', { 
+            reply_markup: adminKb.reply_markup 
+        });
         return;
     }
 
     if (text === '🔙 BACK') {
-        bot.sendMessage(chatId, '🔙 Back to main menu', mainKeyboard());
+        const mainKb = mainKeyboard();
+        bot.sendMessage(chatId, '🔙 Back to main menu', { 
+            reply_markup: mainKb.reply_markup 
+        });
         return;
     }
 
@@ -1624,7 +1640,10 @@ bot.on('message', async (msg) => {
 
         if (text === '📺 CHANNEL MANAGER') {
             const keyboard = getChannelManagerButtons();
-            bot.sendMessage(chatId, '📺 **Channel Manager**\n\nManage public channels, private channels, and private invite links.', { reply_markup: keyboard });
+            bot.sendMessage(chatId, '📺 **Channel Manager**\n\nManage public channels, private channels, and private invite links.', { 
+                parse_mode: 'Markdown',
+                reply_markup: keyboard.reply_markup 
+            });
             return;
         }
     }
@@ -1684,8 +1703,10 @@ bot.on('message', async (msg) => {
             
             userStates.set(chatId, { phone: phone });
             const keyboard = getDurationButtons();
-            bot.sendMessage(chatId, `📱 Target: \`${phone}\`\n⏱️ **Select Bombing Duration:**`, 
-                { parse_mode: 'Markdown', reply_markup: keyboard });
+            bot.sendMessage(chatId, `📱 Target: \`${phone}\`\n⏱️ **Select Bombing Duration:**`, {
+                parse_mode: 'Markdown',
+                reply_markup: keyboard.reply_markup
+            });
             return;
         }
 
@@ -2016,7 +2037,10 @@ bot.on('callback_query', async (callbackQuery) => {
 
     if (data === 'admin_back') {
         await bot.editMessageText('🔐 Admin Panel', { chat_id: chatId, message_id: msgId });
-        bot.sendMessage(chatId, '🔐 Admin Panel', adminKeyboard());
+        const adminKb = adminKeyboard();
+        bot.sendMessage(chatId, '🔐 Admin Panel', { 
+            reply_markup: adminKb.reply_markup 
+        });
         bot.answerCallbackQuery(callbackQuery.id);
         return;
     }
