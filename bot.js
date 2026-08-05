@@ -1,8 +1,9 @@
 // ============================================================
-// bot.js – ULTIMATE OTP Bomber Bot (FINAL FIXED)
+// bot.js – ULTIMATE OTP Bomber Bot (COMPLETE FIXED)
 // Only Main Keyboard Colored, Settings Removed
 // Channel Verification Shows Only Unjoined Channels
-// Protect Number Works with ₹5 Payment
+// Protect Number Works with ₹5 Payment (QR + Screenshot)
+// parse_mode: HTML (Fixes Markdown parsing errors)
 // ============================================================
 
 const TelegramBot = require('node-telegram-bot-api');
@@ -188,15 +189,15 @@ async function protectNumberWithPayment(chatId, phone) {
     
     return { 
         success: true, 
-        msg: `🛡️ **Number Protection Request**\n\n` +
-             `📱 Number: \`${phone}\`\n` +
+        msg: `🛡️ <b>Number Protection Request</b>\n\n` +
+             `📱 Number: <code>${phone}</code>\n` +
              `💰 Price: ₹${PROTECTION_PRICE}\n\n` +
-             `📌 **Instructions:**\n` +
+             `📌 <b>Instructions:</b>\n` +
              `1️⃣ Scan the QR code below\n` +
              `2️⃣ Pay ₹${PROTECTION_PRICE} via UPI\n` +
              `3️⃣ Take a screenshot of payment\n` +
              `4️⃣ Send screenshot here\n\n` +
-             `📸 **After payment, send screenshot!**`,
+             `📸 <b>After payment, send screenshot!</b>`,
         payId: payId
     };
 }
@@ -334,28 +335,28 @@ async function processReferral(userId, code) {
     try {
         const referrerUser = await getUser(referrer._id);
         await bot.sendMessage(referrer._id,
-            `🎉 **New Referral Success!**\n\n` +
+            `🎉 <b>New Referral Success!</b>\n\n` +
             `👤 New User: @${user.username || 'No username'}\n` +
-            `🆔 User ID: \`${userId}\`\n` +
+            `🆔 User ID: <code>${userId}</code>\n` +
             `⭐ Credits Earned: +5\n\n` +
             `📊 Your Total Credits: ${referrerUser.credits}\n` +
             `📊 Your Total Referrals: ${referrer.total_referrals || 0}`,
-            { parse_mode: 'Markdown' }
+            { parse_mode: 'HTML' }
         );
     } catch (e) {}
 
     for (const adminId of ADMIN_IDS) {
         try {
             await bot.sendMessage(adminId,
-                `👥 **New Referral Success!**\n\n` +
+                `👥 <b>New Referral Success!</b>\n\n` +
                 `👤 Referrer: @${referrer.username || 'No username'}\n` +
                 `👤 New User: @${user.username || 'No username'}\n` +
-                `🆔 Referrer ID: \`${referrer._id}\`\n` +
-                `🆔 New User ID: \`${userId}\`\n` +
+                `🆔 Referrer ID: <code>${referrer._id}</code>\n` +
+                `🆔 New User ID: <code>${userId}</code>\n` +
                 `⭐ Credits Earned: 5\n\n` +
                 `📊 Referrer Total Credits: ${referrer.credits}\n` +
                 `📊 Referrer Total Referrals: ${referrer.total_referrals || 0}`,
-                { parse_mode: 'Markdown' }
+                { parse_mode: 'HTML' }
             );
         } catch (e) {}
     }
@@ -525,8 +526,8 @@ async function runBomber(chatId, phone, durationMinutes) {
     const durationText = getDurationText(durationMinutes);
     const msg = await bot.sendMessage(
         chatId,
-        `⚔️ **BOMBING STARTED**\n📱 Target: \`${phone}\`\n⏱️ Duration: ${durationText}\n🔁 Using FAST multi-API network...\n${isUnlimited ? '⭐ UNLIMITED PLAN ACTIVE' : `💳 Cost: ${getBombCost(durationMinutes)} credits`}`,
-        { parse_mode: 'Markdown' }
+        `⚔️ <b>BOMBING STARTED</b>\n📱 Target: <code>${phone}</code>\n⏱️ Duration: ${durationText}\n🔁 Using FAST multi-API network...\n${isUnlimited ? '⭐ UNLIMITED PLAN ACTIVE' : `💳 Cost: ${getBombCost(durationMinutes)} credits`}`,
+        { parse_mode: 'HTML' }
     );
 
     let totalSent = 0;
@@ -576,8 +577,8 @@ async function runBomber(chatId, phone, durationMinutes) {
             
             try {
                 await bot.editMessageText(
-                    `⚔️ **BOMBING IN PROGRESS**\n📱 Target: \`${phone}\`\n⏱️ Time Left: ${timeLeftText}\n📨 SMS: ${displaySms} (${smsPerSec}/s)\n📞 Calls: ${displayCalls} (${callPerSec}/s)\n📱 WA: ${displayWa} (${waPerSec}/s)\n🔄 Cycles: ${cycleCount}\n\n🔴 Use /stop to halt`,
-                    { chat_id: chatId, message_id: msg.message_id, parse_mode: 'Markdown' }
+                    `⚔️ <b>BOMBING IN PROGRESS</b>\n📱 Target: <code>${phone}</code>\n⏱️ Time Left: ${timeLeftText}\n📨 SMS: ${displaySms} (${smsPerSec}/s)\n📞 Calls: ${displayCalls} (${callPerSec}/s)\n📱 WA: ${displayWa} (${waPerSec}/s)\n🔄 Cycles: ${cycleCount}\n\n🔴 Use /stop to halt`,
+                    { chat_id: chatId, message_id: msg.message_id, parse_mode: 'HTML' }
                 );
             } catch (e) {}
         }
@@ -594,8 +595,8 @@ async function runBomber(chatId, phone, durationMinutes) {
     const displayWa = Math.floor(elapsedTotal / 10);
     
     await bot.editMessageText(
-        `✅ **BOMBING ${finalStatus}**\n📱 Target: \`${phone}\`\n📨 SMS: ${displaySms}\n📞 Calls: ${displayCalls}\n📱 WA: ${displayWa}\n🔄 Total Cycles: ${cycleCount}\n\n🟢 Use START BOMB to start again`,
-        { chat_id: chatId, message_id: msg.message_id, parse_mode: 'Markdown' }
+        `✅ <b>BOMBING ${finalStatus}</b>\n📱 Target: <code>${phone}</code>\n📨 SMS: ${displaySms}\n📞 Calls: ${displayCalls}\n📱 WA: ${displayWa}\n🔄 Total Cycles: ${cycleCount}\n\n🟢 Use START BOMB to start again`,
+        { chat_id: chatId, message_id: msg.message_id, parse_mode: 'HTML' }
     );
 
     const updatedUser = await getUser(chatId);
@@ -822,12 +823,12 @@ async function handleBuyCredits(chatId, planKey) {
     if (plan.protect) {
         userStates.set(chatId, { state: 'protect_number' });
         return bot.sendMessage(chatId, 
-            `🛡️ **Number Protection**\n\n` +
+            `🛡️ <b>Number Protection</b>\n\n` +
             `💰 Price: ₹${PROTECTION_PRICE} per number\n` +
             `📌 Send the 10-digit number you want to protect:\n\n` +
             `⚠️ Protected numbers cannot be bombed by anyone!\n\n` +
             `Type /cancel to cancel.`,
-            { parse_mode: 'Markdown' }
+            { parse_mode: 'HTML' }
         );
     }
 
@@ -835,18 +836,18 @@ async function handleBuyCredits(chatId, planKey) {
         return bot.sendMessage(chatId, '❌ Payment QR code not configured yet. Please contact admin.');
     }
 
-    const caption = `💳 **${plan.label}**\n\n` +
-        `📌 **Instructions:**\n` +
+    const caption = `💳 <b>${plan.label}</b>\n\n` +
+        `📌 <b>Instructions:</b>\n` +
         `1️⃣ Scan the QR code below\n` +
         `2️⃣ Pay ₹${plan.price} via UPI\n` +
         `3️⃣ Take a screenshot of payment\n` +
         `4️⃣ Send screenshot here\n\n` +
-        `📸 **After payment, send screenshot!**`;
+        `📸 <b>After payment, send screenshot!</b>`;
 
     try {
         await bot.sendPhoto(chatId, qrCodePath, { 
             caption: caption,
-            parse_mode: 'Markdown'
+            parse_mode: 'HTML'
         });
 
         const payId = Math.random().toString(36).substring(2, 10);
@@ -863,7 +864,7 @@ async function handlePaymentScreenshot(chatId, msg) {
     if (!state || state.state !== 'payment_screenshot') return;
 
     if (!msg.photo) {
-        return bot.sendMessage(chatId, '📸 Please send a **screenshot** of your payment.');
+        return bot.sendMessage(chatId, '📸 Please send a <b>screenshot</b> of your payment.', { parse_mode: 'HTML' });
     }
 
     const planKey = state.plan;
@@ -889,12 +890,12 @@ async function handlePaymentScreenshot(chatId, msg) {
         status: 'pending'
     });
 
-    const adminMsg = `📸 **New Payment Screenshot!**\n\n` +
+    const adminMsg = `📸 <b>New Payment Screenshot!</b>\n\n` +
         `👤 User: ${msg.from.first_name} (@${msg.from.username || 'No username'})\n` +
-        `🆔 User ID: \`${chatId}\`\n` +
+        `🆔 User ID: <code>${chatId}</code>\n` +
         `💳 Plan: ${plan.label}\n` +
         `💰 Amount: ₹${plan.price}\n` +
-        `🆔 Pay ID: \`${payId}\`\n\n` +
+        `🆔 Pay ID: <code>${payId}</code>\n\n` +
         `Approve or Reject:`;
 
     const approvalKeyboard = getApprovalButtons(payId);
@@ -903,7 +904,7 @@ async function handlePaymentScreenshot(chatId, msg) {
         try {
             await bot.sendPhoto(adminId, photo.file_id, {
                 caption: adminMsg,
-                parse_mode: 'Markdown',
+                parse_mode: 'HTML',
                 reply_markup: approvalKeyboard.reply_markup
             });
         } catch (e) {
@@ -912,11 +913,12 @@ async function handlePaymentScreenshot(chatId, msg) {
     }
 
     await bot.sendMessage(chatId, 
-        `✅ **Payment screenshot received!**\n\n` +
+        `✅ <b>Payment screenshot received!</b>\n\n` +
         `⏳ Waiting for admin approval...\n` +
         `📱 Plan: ${plan.label}\n` +
         `💳 Amount: ₹${plan.price}\n\n` +
-        `You will receive credits once approved.`
+        `You will receive credits once approved.`,
+        { parse_mode: 'HTML' }
     );
 
     userStates.delete(chatId);
@@ -928,7 +930,7 @@ async function handlePaymentScreenshot(chatId, msg) {
 
 async function handleProtectionScreenshot(chatId, msg, payId) {
     if (!msg.photo) {
-        return bot.sendMessage(chatId, '📸 Please send a **screenshot** of your payment.');
+        return bot.sendMessage(chatId, '📸 Please send a <b>screenshot</b> of your payment.', { parse_mode: 'HTML' });
     }
 
     const protection = pendingProtections.get(payId);
@@ -945,12 +947,12 @@ async function handleProtectionScreenshot(chatId, msg, payId) {
     protection.status = 'pending_approval';
     pendingProtections.set(payId, protection);
 
-    const adminMsg = `🛡️ **New Number Protection Request!**\n\n` +
+    const adminMsg = `🛡️ <b>New Number Protection Request!</b>\n\n` +
         `👤 User: ${msg.from.first_name} (@${msg.from.username || 'No username'})\n` +
-        `🆔 User ID: \`${chatId}\`\n` +
-        `📱 Number: \`${protection.phone}\`\n` +
+        `🆔 User ID: <code>${chatId}</code>\n` +
+        `📱 Number: <code>${protection.phone}</code>\n` +
         `💰 Amount: ₹${PROTECTION_PRICE}\n` +
-        `🆔 Pay ID: \`${payId}\`\n\n` +
+        `🆔 Pay ID: <code>${payId}</code>\n\n` +
         `Approve or Reject:`;
 
     const approvalKeyboard = getProtectionApprovalButtons(payId);
@@ -959,7 +961,7 @@ async function handleProtectionScreenshot(chatId, msg, payId) {
         try {
             await bot.sendPhoto(adminId, photo.file_id, {
                 caption: adminMsg,
-                parse_mode: 'Markdown',
+                parse_mode: 'HTML',
                 reply_markup: approvalKeyboard.reply_markup
             });
         } catch (e) {
@@ -968,11 +970,12 @@ async function handleProtectionScreenshot(chatId, msg, payId) {
     }
 
     await bot.sendMessage(chatId, 
-        `✅ **Payment screenshot received!**\n\n` +
+        `✅ <b>Payment screenshot received!</b>\n\n` +
         `⏳ Waiting for admin approval...\n` +
         `📱 Number: ${protection.phone}\n` +
         `💰 Amount: ₹${PROTECTION_PRICE}\n\n` +
-        `You will be notified once approved.`
+        `You will be notified once approved.`,
+        { parse_mode: 'HTML' }
     );
 
     userStates.delete(chatId);
@@ -988,7 +991,7 @@ async function handleSetQRCode(chatId, msg) {
     }
 
     if (!msg.photo) {
-        return bot.sendMessage(chatId, '📸 **Please send a photo to set as QR code.**\n\nSend any image that will be shown to users when they buy credits.', { parse_mode: 'Markdown' });
+        return bot.sendMessage(chatId, '📸 <b>Please send a photo to set as QR code.</b>\n\nSend any image that will be shown to users when they buy credits.', { parse_mode: 'HTML' });
     }
 
     try {
@@ -1002,7 +1005,7 @@ async function handleSetQRCode(chatId, msg) {
         
         writer.on('finish', () => {
             qrCodeSet = true;
-            bot.sendMessage(chatId, '✅ **QR Code saved successfully!**\n\nUsers will now see this QR code when buying credits.', { parse_mode: 'Markdown' });
+            bot.sendMessage(chatId, '✅ <b>QR Code saved successfully!</b>\n\nUsers will now see this QR code when buying credits.', { parse_mode: 'HTML' });
         });
         
         writer.on('error', (err) => {
@@ -1031,8 +1034,8 @@ async function handleBroadcast(chatId, msg) {
         
         const processingMsg = await bot.sendMessage(
             chatId,
-            `📢 **Broadcasting to ${totalUsers} users...**\n\n⏳ Please wait...`,
-            { parse_mode: 'Markdown' }
+            `📢 <b>Broadcasting to ${totalUsers} users...</b>\n\n⏳ Please wait...`,
+            { parse_mode: 'HTML' }
         );
         
         let messageType = 'text';
@@ -1093,38 +1096,38 @@ async function handleBroadcast(chatId, msg) {
                 switch (messageType) {
                     case 'text':
                         await bot.sendMessage(targetId, 
-                            `📢 **BROADCAST**\n\n${text}`, 
-                            { parse_mode: 'Markdown', disable_web_page_preview: true, timeout: 10000 }
+                            `📢 <b>BROADCAST</b>\n\n${text}`, 
+                            { parse_mode: 'HTML', disable_web_page_preview: true, timeout: 10000 }
                         );
                         break;
                     case 'photo':
                         await bot.sendPhoto(targetId, mediaId, { 
-                            caption: caption ? `📢 **BROADCAST**\n\n${caption}` : '📢 **BROADCAST**',
-                            parse_mode: 'Markdown', timeout: 10000
+                            caption: caption ? `📢 <b>BROADCAST</b>\n\n${caption}` : '📢 <b>BROADCAST</b>',
+                            parse_mode: 'HTML', timeout: 10000
                         });
                         break;
                     case 'video':
                         await bot.sendVideo(targetId, mediaId, { 
-                            caption: caption ? `📢 **BROADCAST**\n\n${caption}` : '📢 **BROADCAST**',
-                            parse_mode: 'Markdown', timeout: 10000
+                            caption: caption ? `📢 <b>BROADCAST</b>\n\n${caption}` : '📢 <b>BROADCAST</b>',
+                            parse_mode: 'HTML', timeout: 10000
                         });
                         break;
                     case 'document':
                         await bot.sendDocument(targetId, mediaId, { 
-                            caption: caption ? `📢 **BROADCAST**\n\n${caption}` : '📢 **BROADCAST**',
-                            parse_mode: 'Markdown', timeout: 10000
+                            caption: caption ? `📢 <b>BROADCAST</b>\n\n${caption}` : '📢 <b>BROADCAST</b>',
+                            parse_mode: 'HTML', timeout: 10000
                         });
                         break;
                     case 'audio':
                         await bot.sendAudio(targetId, mediaId, { 
-                            caption: caption ? `📢 **BROADCAST**\n\n${caption}` : '📢 **BROADCAST**',
-                            parse_mode: 'Markdown', timeout: 10000
+                            caption: caption ? `📢 <b>BROADCAST</b>\n\n${caption}` : '📢 <b>BROADCAST</b>',
+                            parse_mode: 'HTML', timeout: 10000
                         });
                         break;
                     case 'voice':
                         await bot.sendVoice(targetId, mediaId, { 
-                            caption: caption ? `📢 **BROADCAST**\n\n${caption}` : '📢 **BROADCAST**',
-                            parse_mode: 'Markdown', timeout: 10000
+                            caption: caption ? `📢 <b>BROADCAST</b>\n\n${caption}` : '📢 <b>BROADCAST</b>',
+                            parse_mode: 'HTML', timeout: 10000
                         });
                         break;
                     case 'sticker':
@@ -1132,12 +1135,12 @@ async function handleBroadcast(chatId, msg) {
                         break;
                     case 'animation':
                         await bot.sendAnimation(targetId, mediaId, { 
-                            caption: caption ? `📢 **BROADCAST**\n\n${caption}` : '📢 **BROADCAST**',
-                            parse_mode: 'Markdown', timeout: 10000
+                            caption: caption ? `📢 <b>BROADCAST</b>\n\n${caption}` : '📢 <b>BROADCAST</b>',
+                            parse_mode: 'HTML', timeout: 10000
                         });
                         break;
                     default:
-                        await bot.sendMessage(targetId, `📢 **BROADCAST**\n\nPlease check the channel for updates.`, { parse_mode: 'Markdown' });
+                        await bot.sendMessage(targetId, `📢 <b>BROADCAST</b>\n\nPlease check the channel for updates.`, { parse_mode: 'HTML' });
                 }
                 success++;
             } catch (error) {
@@ -1158,7 +1161,7 @@ async function handleBroadcast(chatId, msg) {
                 
                 try {
                     await bot.editMessageText(
-                        `📢 **BROADCASTING...**\n\n` +
+                        `📢 <b>BROADCASTING...</b>\n\n` +
                         `📊 Total Users: ${totalUsers}\n` +
                         `✅ Success: ${success}\n` +
                         `❌ Failed: ${fail}\n` +
@@ -1167,7 +1170,7 @@ async function handleBroadcast(chatId, msg) {
                         `⏳ Progress: ${progress}%\n` +
                         `⏱️ Elapsed: ${elapsed}s\n` +
                         `📎 Type: ${messageType.toUpperCase()}`,
-                        { chat_id: chatId, message_id: processingMsg.message_id, parse_mode: 'Markdown' }
+                        { chat_id: chatId, message_id: processingMsg.message_id, parse_mode: 'HTML' }
                     );
                 } catch (e) {}
             }
@@ -1178,7 +1181,7 @@ async function handleBroadcast(chatId, msg) {
         const totalTime = Math.floor((Date.now() - startTime) / 1000);
         
         await bot.editMessageText(
-            `✅ **BROADCAST COMPLETED!**\n\n` +
+            `✅ <b>BROADCAST COMPLETED!</b>\n\n` +
             `📊 Total Users: ${totalUsers}\n` +
             `✅ Success: ${success}\n` +
             `❌ Failed: ${fail}\n` +
@@ -1186,7 +1189,7 @@ async function handleBroadcast(chatId, msg) {
             `❓ Invalid IDs: ${invalid}\n` +
             `⏱️ Time Taken: ${totalTime}s\n` +
             `📎 Message Type: ${messageType.toUpperCase()}`,
-            { chat_id: chatId, message_id: processingMsg.message_id, parse_mode: 'Markdown' }
+            { chat_id: chatId, message_id: processingMsg.message_id, parse_mode: 'HTML' }
         );
         
     } catch (error) {
@@ -1224,10 +1227,10 @@ bot.onText(/\/start/, async (msg) => {
     const result = await checkChannelJoin(chatId, bot);
     if (!result.joined) {
         const keyboard = await getChannelJoinButtons(chatId);
-        let msgText = `🚫 **Please join our channel(s) first!**\n\n`;
+        let msgText = `🚫 <b>Please join our channel(s) first!</b>\n\n`;
         
         if (result.unjoined.length > 0) {
-            msgText += `🔴 **Missing Channels:**\n`;
+            msgText += `🔴 <b>Missing Channels:</b>\n`;
             for (const ch of result.unjoined) {
                 msgText += `• ${ch}\n`;
             }
@@ -1235,7 +1238,7 @@ bot.onText(/\/start/, async (msg) => {
         }
         
         if (result.privateLinks.length > 0) {
-            msgText += `🔒 **Private Channel Links:**\n`;
+            msgText += `🔒 <b>Private Channel Links:</b>\n`;
             for (const link of result.privateLinks) {
                 msgText += `• ${link}\n`;
             }
@@ -1245,7 +1248,7 @@ bot.onText(/\/start/, async (msg) => {
         msgText += `After joining all channels, click the button below.`;
         
         bot.sendMessage(chatId, msgText, { 
-            parse_mode: 'Markdown',
+            parse_mode: 'HTML',
             reply_markup: keyboard 
         });
         return;
@@ -1290,11 +1293,11 @@ async function showMainMenu(chatId) {
  ─【 𝐘𝐎𝐔-𝐀𝐑𝐄-𝐁𝐄𝐒𝐓 】─`;
 
     const inviteLink = `https://t.me/${botInfo.username}?start=${code}`;
-    const fullMessage = welcomeText + `\n\n🔗 Your Referral Code: \`${code}\`\n📤 Share: ${inviteLink}`;
+    const fullMessage = welcomeText + `\n\n🔗 Your Referral Code: <code>${code}</code>\n📤 Share: ${inviteLink}`;
     
     const mainKb = mainKeyboard();
     bot.sendMessage(chatId, fullMessage, { 
-        parse_mode: 'Markdown', 
+        parse_mode: 'HTML', 
         reply_markup: mainKb.reply_markup 
     });
 }
@@ -1351,7 +1354,7 @@ bot.on('message', async (msg) => {
         
         const result = await protectNumberWithPayment(chatId, phone);
         if (!result.success) {
-            return bot.sendMessage(chatId, result.msg, { parse_mode: 'Markdown' });
+            return bot.sendMessage(chatId, result.msg, { parse_mode: 'HTML' });
         }
         
         if (!qrCodeSet) {
@@ -1361,7 +1364,7 @@ bot.on('message', async (msg) => {
         try {
             await bot.sendPhoto(chatId, qrCodePath, { 
                 caption: result.msg,
-                parse_mode: 'Markdown'
+                parse_mode: 'HTML'
             });
             
             userStates.set(chatId, { 
@@ -1456,7 +1459,7 @@ bot.on('message', async (msg) => {
         if (!ADMIN_IDS.includes(Number(chatId))) {
             return bot.sendMessage(chatId, '❌ Admin only!');
         }
-        bot.sendMessage(chatId, '📸 **Send QR Code Photo**\n\nSend a photo to set as payment QR code.', { parse_mode: 'Markdown' });
+        bot.sendMessage(chatId, '📸 <b>Send QR Code Photo</b>\n\nSend a photo to set as payment QR code.', { parse_mode: 'HTML' });
         userStates.set(chatId, { state: 'set_qr' });
         return;
     }
@@ -1478,21 +1481,21 @@ bot.on('message', async (msg) => {
             return bot.sendMessage(chatId, '📭 No pending payments.');
         }
 
-        let msgText = `💳 **Pending Payments** (${pending.length})\n\n`;
+        let msgText = `💳 <b>Pending Payments</b> (${pending.length})\n\n`;
         for (const p of pending) {
             msgText += `👤 ${p.first_name} (@${p.username})\n`;
             msgText += `💳 ${p.plan} - ₹${p.price}\n`;
-            msgText += `🆔 \`${p.payId}\`\n\n`;
+            msgText += `🆔 <code>${p.payId}</code>\n\n`;
         }
-        bot.sendMessage(chatId, msgText, { parse_mode: 'Markdown' });
+        bot.sendMessage(chatId, msgText, { parse_mode: 'HTML' });
         return;
     }
 
     // ===== BUY CREDITS =====
     if (text === '💳 BUY CREDITS') {
         const keyboard = getPaymentButtons();
-        bot.sendMessage(chatId, '💳 **Choose a plan:**', { 
-            parse_mode: 'Markdown', 
+        bot.sendMessage(chatId, '💳 <b>Choose a plan:</b>', { 
+            parse_mode: 'HTML', 
             reply_markup: keyboard.reply_markup 
         });
         return;
@@ -1502,23 +1505,23 @@ bot.on('message', async (msg) => {
     if (text === '🛡️ PROTECT NUMBER') {
         userStates.set(chatId, { state: 'protect_number' });
         return bot.sendMessage(chatId, 
-            `🛡️ **Number Protection**\n\n` +
+            `🛡️ <b>Number Protection</b>\n\n` +
             `💰 Price: ₹${PROTECTION_PRICE} per number\n` +
             `📌 Send the 10-digit number you want to protect:\n\n` +
             `⚠️ Protected numbers cannot be bombed by anyone!\n\n` +
             `Type /cancel to cancel.`,
-            { parse_mode: 'Markdown' }
+            { parse_mode: 'HTML' }
         );
     }
 
     // ===== MY CREDITS =====
     if (text === '💰 MY CREDITS') {
         const isUnlimited = user.daily_unlimited > Date.now() / 1000 || user.lifetime_unlimited === true;
-        const unlimitedText = isUnlimited ? '\n⭐ **Unlimited Plan Active!**' : '';
-        const lifetimeText = user.lifetime_unlimited ? '🔮 **Lifetime Unlimited Active!**' : '';
+        const unlimitedText = isUnlimited ? '\n⭐ <b>Unlimited Plan Active!</b>' : '';
+        const lifetimeText = user.lifetime_unlimited ? '🔮 <b>Lifetime Unlimited Active!</b>' : '';
         bot.sendMessage(chatId, 
-            `💰 **Your Credits:** \`${user.credits}\`${unlimitedText}\n${lifetimeText}\n⚔️ **Total Attacks:** ${user.total_attacks || 0}\n👥 **Total Referrals:** ${user.total_referrals || 0}\n\n💡 Each minute costs 1 credit (max 10)\n⭐ 1 Day Unlimited: 50 coins\n🔮 Lifetime Unlimited: 400 coins\n🛡️ Protect Number: ₹${PROTECTION_PRICE}`,
-            { parse_mode: 'Markdown' }
+            `💰 <b>Your Credits:</b> <code>${user.credits}</code>${unlimitedText}\n${lifetimeText}\n⚔️ <b>Total Attacks:</b> ${user.total_attacks || 0}\n👥 <b>Total Referrals:</b> ${user.total_referrals || 0}\n\n💡 Each minute costs 1 credit (max 10)\n⭐ 1 Day Unlimited: 50 coins\n🔮 Lifetime Unlimited: 400 coins\n🛡️ Protect Number: ₹${PROTECTION_PRICE}`,
+            { parse_mode: 'HTML' }
         );
         return;
     }
@@ -1541,8 +1544,8 @@ bot.on('message', async (msg) => {
         user.last_daily = now;
         await user.save();
         const newBalance = (await getUser(chatId)).credits;
-        await bot.editMessageText(`🎉 **You won ${reward} credits!**\n💰 New balance: ${newBalance}`, 
-            { chat_id: chatId, message_id: spinMsg.message_id, parse_mode: 'Markdown' });
+        await bot.editMessageText(`🎉 <b>You won ${reward} credits!</b>\n💰 New balance: ${newBalance}`, 
+            { chat_id: chatId, message_id: spinMsg.message_id, parse_mode: 'HTML' });
         return;
     }
 
@@ -1558,13 +1561,13 @@ bot.on('message', async (msg) => {
         const result = await checkChannelJoin(chatId, bot);
         if (!result.joined) {
             const keyboard = await getChannelJoinButtons(chatId);
-            let msgText = `🚫 **Please join our channel(s) first!**\n\n`;
+            let msgText = `🚫 <b>Please join our channel(s) first!</b>\n\n`;
             for (const ch of result.unjoined) {
                 msgText += `• ${ch}\n`;
             }
             msgText += `\nAfter joining all channels, click the button below.`;
             return bot.sendMessage(chatId, msgText, { 
-                parse_mode: 'Markdown',
+                parse_mode: 'HTML',
                 reply_markup: keyboard 
             });
         }
@@ -1572,8 +1575,8 @@ bot.on('message', async (msg) => {
         const botInfo = await bot.getMe();
         const refData = await getReferralData(chatId);
         const count = refData.count || 0;
-        const msgText = `🔗 **Your Referral Code**\n\n🎯 \`${code}\`\n\n📊 You have referred: ${count} users\n💰 You earned: ${count * 5} credits\n\n**How it works:**\n• Share your code with friends\n• When they join, both get 5 credits!\n• **Note:** Only 1 referral per minute (anti-spam)\n• Invite link: \`https://t.me/${botInfo.username}?start=${code}\``;
-        bot.sendMessage(chatId, msgText, { parse_mode: 'Markdown' });
+        const msgText = `🔗 <b>Your Referral Code</b>\n\n🎯 <code>${code}</code>\n\n📊 You have referred: ${count} users\n💰 You earned: ${count * 5} credits\n\n<b>How it works:</b>\n• Share your code with friends\n• When they join, both get 5 credits!\n• <b>Note:</b> Only 1 referral per minute (anti-spam)\n• Invite link: <code>https://t.me/${botInfo.username}?start=${code}</code>`;
+        bot.sendMessage(chatId, msgText, { parse_mode: 'HTML' });
         return;
     }
 
@@ -1584,8 +1587,8 @@ bot.on('message', async (msg) => {
         const totalSent = sessions.reduce((sum, s) => sum + (s.total_sent || 0), 0);
         const isUnlimited = user.daily_unlimited > Date.now() / 1000 || user.lifetime_unlimited === true;
         bot.sendMessage(chatId, 
-            `📊 **Your Stats**\n👤 ID: ${chatId}\n💰 Credits: ${user.credits}\n⚔️ Attacks: ${user.total_attacks || 0}\n📈 Sessions: ${totalSessions}\n📬 OTPs Sent: ${totalSent}\n⭐ Unlimited: ${isUnlimited ? '✅ Active' : '❌ Inactive'}\n👥 Referrals: ${user.total_referrals || 0}`,
-            { parse_mode: 'Markdown' }
+            `📊 <b>Your Stats</b>\n👤 ID: ${chatId}\n💰 Credits: ${user.credits}\n⚔️ Attacks: ${user.total_attacks || 0}\n📈 Sessions: ${totalSessions}\n📬 OTPs Sent: ${totalSent}\n⭐ Unlimited: ${isUnlimited ? '✅ Active' : '❌ Inactive'}\n👥 Referrals: ${user.total_referrals || 0}`,
+            { parse_mode: 'HTML' }
         );
         return;
     }
@@ -1593,8 +1596,8 @@ bot.on('message', async (msg) => {
     // ===== HELP =====
     if (text === '❓ HELP') {
         bot.sendMessage(chatId, 
-            `🤖 **BOT COMMANDS & HELP**\n\n📱 **START BOMB** - Start bombing (choose duration)\n⏹️ **STOP BOMB** - Stop active bombing\n💰 **MY CREDITS** - Check your credits\n🎁 **DAILY SPIN** - Daily spin wheel (1-5 credits)\n🎟️ **REDEEM CODE** - Redeem code\n🔗 **REFERRAL** - Get referral link\n💳 **BUY CREDITS** - Buy credits\n🛡️ **PROTECT NUMBER** - Protect a number (₹${PROTECTION_PRICE})\n📊 **MY STATS** - View your stats\n\n💡 **Bombing Costs:**\n• 1-10 minutes: 1 credit per minute\n• 11-60 minutes: 10 credits\n• ⭐ 1 Day Unlimited: 50 coins\n• 🔮 Lifetime Unlimited: 400 coins\n\n🛡️ **Number Protection:** ₹${PROTECTION_PRICE} per number\n\n📞 **Voice/WA Calls:** Always active via API5\n\n💳 **Payment:**\n• Select plan > Scan QR > Pay > Send screenshot\n• Admin will approve\n\n⭐ **Referral Bonus:** 5 credits each!`,
-            { parse_mode: 'Markdown' }
+            `🤖 <b>BOT COMMANDS & HELP</b>\n\n📱 <b>START BOMB</b> - Start bombing (choose duration)\n⏹️ <b>STOP BOMB</b> - Stop active bombing\n💰 <b>MY CREDITS</b> - Check your credits\n🎁 <b>DAILY SPIN</b> - Daily spin wheel (1-5 credits)\n🎟️ <b>REDEEM CODE</b> - Redeem code\n🔗 <b>REFERRAL</b> - Get referral link\n💳 <b>BUY CREDITS</b> - Buy credits\n🛡️ <b>PROTECT NUMBER</b> - Protect a number (₹${PROTECTION_PRICE})\n📊 <b>MY STATS</b> - View your stats\n\n💡 <b>Bombing Costs:</b>\n• 1-10 minutes: 1 credit per minute\n• 11-60 minutes: 10 credits\n• ⭐ 1 Day Unlimited: 50 coins\n• 🔮 Lifetime Unlimited: 400 coins\n\n🛡️ <b>Number Protection:</b> ₹${PROTECTION_PRICE} per number\n\n📞 <b>Voice/WA Calls:</b> Always active via API5\n\n💳 <b>Payment:</b>\n• Select plan > Scan QR > Pay > Send screenshot\n• Admin will approve\n\n⭐ <b>Referral Bonus:</b> 5 credits each!`,
+            { parse_mode: 'HTML' }
         );
         return;
     }
@@ -1629,8 +1632,8 @@ bot.on('message', async (msg) => {
             const protectedData = await getProtectedWithOwners();
             const totalApis = 140;
             bot.sendMessage(chatId, 
-                `📊 **BOT STATS**\n👥 Users: ${totalUsers}\n💰 Total credits: ${totalCredits}\n⚔️ Attacks: ${totalAttacks}\n📡 APIs loaded: ${totalApis}\n📺 Channels: ${channels.length}\n🔒 Private Channels: ${privateChannels.length}\n🔗 Private Links: ${privateLinks.length}\n🛡️ Protected Numbers: ${protectedData.numbers.length}\n🌐 Load Balancer: ✅ Active\n🌐 API Instances: 5 (API5: Voice/WA)`,
-                { parse_mode: 'Markdown' }
+                `📊 <b>BOT STATS</b>\n👥 Users: ${totalUsers}\n💰 Total credits: ${totalCredits}\n⚔️ Attacks: ${totalAttacks}\n📡 APIs loaded: ${totalApis}\n📺 Channels: ${channels.length}\n🔒 Private Channels: ${privateChannels.length}\n🔗 Private Links: ${privateLinks.length}\n🛡️ Protected Numbers: ${protectedData.numbers.length}\n🌐 Load Balancer: ✅ Active\n🌐 API Instances: 5 (API5: Voice/WA)`,
+                { parse_mode: 'HTML' }
             );
             return;
         }
@@ -1683,7 +1686,7 @@ bot.on('message', async (msg) => {
 
         if (text === '📋 PROTECTED LIST') {
             const data = await getProtectedWithOwners();
-            let msg = '🛡️ **Protected Numbers**\n\n';
+            let msg = '🛡️ <b>Protected Numbers</b>\n\n';
             if (data.numbers.length === 0) {
                 msg += 'None';
             } else {
@@ -1692,17 +1695,17 @@ bot.on('message', async (msg) => {
                     msg += `📱 ${num} (Protected by: ${ownerId})\n`;
                 }
             }
-            bot.sendMessage(chatId, msg);
+            bot.sendMessage(chatId, msg, { parse_mode: 'HTML' });
             return;
         }
 
         if (text === '📢 BROADCAST') {
             adminBroadcastState.set(chatId, { active: true });
             bot.sendMessage(chatId, 
-                `📢 **Broadcast Mode Activated**\n\n` +
+                `📢 <b>Broadcast Mode Activated</b>\n\n` +
                 `Send any message (text, photo, video, GIF, etc.) and I'll send it to ALL users!\n\n` +
                 `Send /cancel to exit.`,
-                { parse_mode: 'Markdown' }
+                { parse_mode: 'HTML' }
             );
             return;
         }
@@ -1716,9 +1719,9 @@ bot.on('message', async (msg) => {
                 const start = pageNum * perPage;
                 const end = start + perPage;
                 const chunk = users.slice(start, end);
-                let msg = '👥 **ALL USERS**\n\n';
+                let msg = '👥 <b>ALL USERS</b>\n\n';
                 chunk.forEach(u => {
-                    msg += `🆔 \`${u._id}\` | @${u.username || 'no_username'} | 💰${u.credits} | 👥${u.total_referrals || 0}\n`;
+                    msg += `🆔 <code>${u._id}</code> | @${u.username || 'no_username'} | 💰${u.credits} | 👥${u.total_referrals || 0}\n`;
                 });
                 msg += `\nPage ${pageNum+1}/${totalPages}`;
                 const markup = totalPages > 1 ? {
@@ -1729,7 +1732,7 @@ bot.on('message', async (msg) => {
                         ]
                     }
                 } : undefined;
-                return bot.sendMessage(chatId, msg, { parse_mode: 'Markdown', ...markup });
+                return bot.sendMessage(chatId, msg, { parse_mode: 'HTML', ...markup });
             };
             await sendPage(0);
             userStates.set(chatId, { state: 'allusers', users, page: 0, perPage, totalPages });
@@ -1744,8 +1747,8 @@ bot.on('message', async (msg) => {
 
         if (text === '📺 CHANNEL MANAGER') {
             const keyboard = getChannelManagerButtons();
-            bot.sendMessage(chatId, '📺 **Channel Manager**\n\nManage public channels, private channels, and private invite links.', { 
-                parse_mode: 'Markdown',
+            bot.sendMessage(chatId, '📺 <b>Channel Manager</b>\n\nManage public channels, private channels, and private invite links.', { 
+                parse_mode: 'HTML',
                 reply_markup: keyboard.reply_markup 
             });
             return;
@@ -1760,13 +1763,13 @@ bot.on('message', async (msg) => {
         const result = await checkChannelJoin(chatId, bot);
         if (!result.joined) {
             const keyboard = await getChannelJoinButtons(chatId);
-            let msgText = `🚫 **Please join our channel(s) first!**\n\n`;
+            let msgText = `🚫 <b>Please join our channel(s) first!</b>\n\n`;
             for (const ch of result.unjoined) {
                 msgText += `• ${ch}\n`;
             }
             msgText += `\nAfter joining all channels, click the button below.`;
             return bot.sendMessage(chatId, msgText, { 
-                parse_mode: 'Markdown',
+                parse_mode: 'HTML',
                 reply_markup: keyboard 
             });
         }
@@ -1814,8 +1817,8 @@ bot.on('message', async (msg) => {
             
             userStates.set(chatId, { phone: phone });
             const keyboard = getDurationButtons();
-            bot.sendMessage(chatId, `📱 Target: \`${phone}\`\n⏱️ **Select Bombing Duration:**`, {
-                parse_mode: 'Markdown',
+            bot.sendMessage(chatId, `📱 Target: <code>${phone}</code>\n⏱️ <b>Select Bombing Duration:</b>`, {
+                parse_mode: 'HTML',
                 reply_markup: keyboard.reply_markup
             });
             return;
@@ -1834,7 +1837,7 @@ bot.on('message', async (msg) => {
             if (isNaN(amount) || amount <= 0 || amount > 1000) return bot.sendMessage(chatId, '❌ Invalid amount. Max 1000.');
             const code = 'RTF' + Math.random().toString(36).substring(2, 7).toUpperCase();
             await createRedeemCode(code, amount);
-            bot.sendMessage(chatId, `✅ Code: \`${code}\`\nAmount: ${amount} credits`, { parse_mode: 'Markdown' });
+            bot.sendMessage(chatId, `✅ Code: <code>${code}</code>\nAmount: ${amount} credits`, { parse_mode: 'HTML' });
             userStates.delete(chatId);
             return;
         }
@@ -1899,7 +1902,7 @@ bot.on('message', async (msg) => {
             await target.save();
             bot.sendMessage(chatId, `✅ 1-Day Unlimited plan granted to user ${uid} for 24 hours!`);
             try {
-                await bot.sendMessage(uid, '⭐ **You\'ve been granted a 1-Day Unlimited Bombing Plan!**\n\nYou can now bomb any number for free for the next 24 hours!\nUse START BOMB to start bombing.');
+                await bot.sendMessage(uid, '⭐ <b>You\'ve been granted a 1-Day Unlimited Bombing Plan!</b>\n\nYou can now bomb any number for free for the next 24 hours!\nUse START BOMB to start bombing.', { parse_mode: 'HTML' });
             } catch (e) {}
             userStates.delete(chatId);
             return;
@@ -1928,7 +1931,7 @@ bot.on('callback_query', async (callbackQuery) => {
             await showMainMenu(chatId);
         } else {
             const keyboard = await getChannelJoinButtons(chatId);
-            let msgText = `❌ **You still haven't joined all channels!**\n\n`;
+            let msgText = `❌ <b>You still haven't joined all channels!</b>\n\n`;
             for (const ch of result.unjoined) {
                 msgText += `• ${ch}\n`;
             }
@@ -1936,6 +1939,7 @@ bot.on('callback_query', async (callbackQuery) => {
             await bot.editMessageText(msgText, { 
                 chat_id: chatId, 
                 message_id: msgId,
+                parse_mode: 'HTML',
                 reply_markup: keyboard 
             });
             bot.answerCallbackQuery(callbackQuery.id, { text: '❌ You still haven\'t joined all channels.', show_alert: true });
@@ -1985,11 +1989,11 @@ bot.on('callback_query', async (callbackQuery) => {
         try {
             if (isProtect) {
                 bot.sendMessage(userId, 
-                    `🛡️ **You purchased Number Protection!**\n\n` +
+                    `🛡️ <b>You purchased Number Protection!</b>\n\n` +
                     `💰 Payment of ₹${payment.price} approved!\n\n` +
                     `Now send the 10-digit number you want to protect.\n` +
                     `Type /cancel to cancel.`,
-                    { parse_mode: 'Markdown' }
+                    { parse_mode: 'HTML' }
                 );
                 userStates.set(userId, { state: 'protect_number' });
             } else if (isLifetime) {
@@ -2010,19 +2014,19 @@ bot.on('callback_query', async (callbackQuery) => {
             if (!isProtect) {
                 try {
                     const msgText = isLifetime ? 
-                        `🎉 **Payment Approved!**\n\n✅ Your payment of ₹${payment.price} has been approved.\n🔮 **Lifetime Unlimited Plan Activated Forever!**\n\nUse START BOMB to start bombing!` :
-                        `🎉 **Payment Approved!**\n\n✅ Your payment of ₹${payment.price} has been approved.\n💰 ${credits > 0 ? `Added ${credits} credits!` : '⭐ Unlimited Plan Activated for 24 hours!'}\n\nUse START BOMB to start bombing!`;
-                    await bot.sendMessage(userId, msgText);
+                        `🎉 <b>Payment Approved!</b>\n\n✅ Your payment of ₹${payment.price} has been approved.\n🔮 <b>Lifetime Unlimited Plan Activated Forever!</b>\n\nUse START BOMB to start bombing!` :
+                        `🎉 <b>Payment Approved!</b>\n\n✅ Your payment of ₹${payment.price} has been approved.\n💰 ${credits > 0 ? `Added ${credits} credits!` : '⭐ Unlimited Plan Activated for 24 hours!'}\n\nUse START BOMB to start bombing!`;
+                    await bot.sendMessage(userId, msgText, { parse_mode: 'HTML' });
                 } catch (e) {}
             }
 
             await bot.editMessageText(
-                `✅ **Payment Approved!**\n\n` +
+                `✅ <b>Payment Approved!</b>\n\n` +
                 `👤 User: ${payment.first_name}\n` +
                 `💳 Plan: ${payment.plan}\n` +
                 `💰 Amount: ₹${payment.price}\n` +
                 `✅ Status: APPROVED${isLifetime ? ' (Lifetime)' : ''}${isProtect ? ' (Protection)' : ''}`,
-                { chat_id: chatId, message_id: msgId }
+                { chat_id: chatId, message_id: msgId, parse_mode: 'HTML' }
             );
 
             if (!isProtect) {
@@ -2054,19 +2058,20 @@ bot.on('callback_query', async (callbackQuery) => {
 
         try {
             await bot.sendMessage(payment.userId,
-                `❌ **Payment Rejected**\n\n` +
+                `❌ <b>Payment Rejected</b>\n\n` +
                 `Your payment of ₹${payment.price} was rejected.\n\n` +
-                `Please try again with a clear screenshot.`
+                `Please try again with a clear screenshot.`,
+                { parse_mode: 'HTML' }
             );
         } catch (e) {}
 
         await bot.editMessageText(
-            `❌ **Payment Rejected**\n\n` +
+            `❌ <b>Payment Rejected</b>\n\n` +
             `👤 User: ${payment.first_name}\n` +
             `💳 Plan: ${payment.plan}\n` +
             `💰 Amount: ₹${payment.price}\n` +
             `❌ Status: REJECTED`,
-            { chat_id: chatId, message_id: msgId }
+            { chat_id: chatId, message_id: msgId, parse_mode: 'HTML' }
         );
 
         pendingScreenshots.delete(payId);
@@ -2098,20 +2103,21 @@ bot.on('callback_query', async (callbackQuery) => {
 
             try {
                 await bot.sendMessage(userId,
-                    `🛡️ **Number Protection Approved!**\n\n` +
-                    `✅ Your number \`${phone}\` is now PROTECTED!\n` +
+                    `🛡️ <b>Number Protection Approved!</b>\n\n` +
+                    `✅ Your number <code>${phone}</code> is now PROTECTED!\n` +
                     `💰 Payment of ₹${PROTECTION_PRICE} approved.\n\n` +
-                    `🔒 This number is now safe from bombing!`
+                    `🔒 This number is now safe from bombing!`,
+                    { parse_mode: 'HTML' }
                 );
             } catch (e) {}
 
             await bot.editMessageText(
-                `✅ **Protection Approved!**\n\n` +
+                `✅ <b>Protection Approved!</b>\n\n` +
                 `👤 User: ${protection.userId}\n` +
-                `📱 Number: \`${phone}\`\n` +
+                `📱 Number: <code>${phone}</code>\n` +
                 `💰 Amount: ₹${PROTECTION_PRICE}\n` +
                 `✅ Status: APPROVED`,
-                { chat_id: chatId, message_id: msgId }
+                { chat_id: chatId, message_id: msgId, parse_mode: 'HTML' }
             );
 
             pendingProtections.delete(payId);
@@ -2141,19 +2147,20 @@ bot.on('callback_query', async (callbackQuery) => {
 
         try {
             await bot.sendMessage(protection.userId,
-                `❌ **Protection Rejected**\n\n` +
-                `Your request to protect \`${protection.phone}\` was rejected.\n\n` +
-                `Please try again with a clear screenshot.`
+                `❌ <b>Protection Rejected</b>\n\n` +
+                `Your request to protect <code>${protection.phone}</code> was rejected.\n\n` +
+                `Please try again with a clear screenshot.`,
+                { parse_mode: 'HTML' }
             );
         } catch (e) {}
 
         await bot.editMessageText(
-            `❌ **Protection Rejected**\n\n` +
+            `❌ <b>Protection Rejected</b>\n\n` +
             `👤 User: ${protection.userId}\n` +
-            `📱 Number: \`${protection.phone}\`\n` +
+            `📱 Number: <code>${protection.phone}</code>\n` +
             `💰 Amount: ₹${PROTECTION_PRICE}\n` +
             `❌ Status: REJECTED`,
-            { chat_id: chatId, message_id: msgId }
+            { chat_id: chatId, message_id: msgId, parse_mode: 'HTML' }
         );
 
         pendingProtections.delete(payId);
@@ -2196,12 +2203,12 @@ bot.on('callback_query', async (callbackQuery) => {
             await bot.editMessageText('📭 No channels/links to remove.', { chat_id: chatId, message_id: msgId });
             return bot.answerCallbackQuery(callbackQuery.id);
         }
-        let msg = '📺 **Current Channels:**\n\n';
+        let msg = '📺 <b>Current Channels:</b>\n\n';
         if (channels.length) msg += '🔓 Public:\n' + channels.join('\n') + '\n\n';
         if (privateChannels.length) msg += '🔒 Private:\n' + privateChannels.join('\n') + '\n\n';
         if (privateLinks.length) msg += '🔗 Private Links:\n' + privateLinks.join('\n') + '\n\n';
         msg += 'Send channel username or link to remove:';
-        await bot.editMessageText(msg, { chat_id: chatId, message_id: msgId });
+        await bot.editMessageText(msg, { chat_id: chatId, message_id: msgId, parse_mode: 'HTML' });
         userStates.set(chatId, { state: 'remove_channel' });
         bot.answerCallbackQuery(callbackQuery.id);
         return;
@@ -2212,12 +2219,12 @@ bot.on('callback_query', async (callbackQuery) => {
         const channels = await getChannels();
         const privateChannels = await getPrivateChannels();
         const privateLinks = await getPrivateLinks();
-        let msg = '📺 **Required Channels:**\n\n';
+        let msg = '📺 <b>Required Channels:</b>\n\n';
         if (channels.length) msg += '🔓 Public:\n' + channels.join('\n') + '\n\n';
         if (privateChannels.length) msg += '🔒 Private:\n' + privateChannels.join('\n') + '\n\n';
         if (privateLinks.length) msg += '🔗 Private Links:\n' + privateLinks.join('\n') + '\n\n';
         if (!channels.length && !privateChannels.length && !privateLinks.length) msg = '📭 No channels/links configured.';
-        await bot.editMessageText(msg, { chat_id: chatId, message_id: msgId });
+        await bot.editMessageText(msg, { chat_id: chatId, message_id: msgId, parse_mode: 'HTML' });
         bot.answerCallbackQuery(callbackQuery.id);
         return;
     }
@@ -2239,9 +2246,9 @@ bot.on('callback_query', async (callbackQuery) => {
             const start = page * state.perPage;
             const end = start + state.perPage;
             const chunk = state.users.slice(start, end);
-            let msg = '👥 **ALL USERS**\n\n';
+            let msg = '👥 <b>ALL USERS</b>\n\n';
             chunk.forEach(u => {
-                msg += `🆔 \`${u._id}\` | @${u.username || 'no_username'} | 💰${u.credits} | 👥${u.total_referrals || 0}\n`;
+                msg += `🆔 <code>${u._id}</code> | @${u.username || 'no_username'} | 💰${u.credits} | 👥${u.total_referrals || 0}\n`;
             });
             msg += `\nPage ${page+1}/${state.totalPages}`;
             const markup = totalPages > 1 ? {
@@ -2252,7 +2259,7 @@ bot.on('callback_query', async (callbackQuery) => {
                     ]
                 }
             } : undefined;
-            await bot.editMessageText(msg, { chat_id: chatId, message_id: msgId, parse_mode: 'Markdown', ...markup });
+            await bot.editMessageText(msg, { chat_id: chatId, message_id: msgId, parse_mode: 'HTML', ...markup });
             state.page = page;
             userStates.set(chatId, state);
         }
@@ -2306,3 +2313,4 @@ console.log(`💳 Screenshot approval system: ✅`);
 console.log(`📢 Broadcast system: ✅`);
 console.log(`👑 Admin panel: ✅`);
 console.log(`⚙️ Settings: REMOVED`);
+console.log(`📝 parse_mode: HTML (Fixed parsing errors)`);
