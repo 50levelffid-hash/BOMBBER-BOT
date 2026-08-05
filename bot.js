@@ -17,9 +17,9 @@ const BOT_TOKEN = "8212356485:AAGeN3peo9uHPG8eCLFRuWjs12hCVC-jNs4";
 const ADMIN_IDS = [6346250222];
 
 const API_URLS = {
-    api1: 'https://api-server-mey8.onrender.com',
+    api1: 'https://api-server-padj.onrender.com',
     api2: 'https://api-server-fy8w.onrender.com',
-    api3: 'https://api-server-padj.onrender.com',
+    api3: 'https://api-server-mey8.onrender.com',
     api4: 'https://api-server-0abv.onrender.com',
     api5: 'https://wasataap-call-api.onrender.com'
 };
@@ -800,7 +800,6 @@ async function getChannelJoinButtons(chatId) {
     
     const buttons = [];
     
-    // Channel buttons with style: 'success'
     for (const channel of result.unjoined) {
         buttons.push([{ 
             text: `🔴 ${channel} (Not Joined)`, 
@@ -854,7 +853,6 @@ async function handleBuyCredits(chatId, planKey) {
         );
     }
 
-    // Get QR from DB
     const qr = await getQRCode();
     if (!qr) {
         return bot.sendMessage(chatId, '❌ Payment QR code not configured yet. Please contact admin.');
@@ -1006,7 +1004,7 @@ async function handleProtectionScreenshot(chatId, msg, payId) {
 }
 
 // ============================================================
-// ===== QR CODE SET HANDLER (Now saves to MongoDB) =====
+// ===== QR CODE SET HANDLER =====
 // ============================================================
 
 async function handleSetQRCode(chatId, msg) {
@@ -1026,7 +1024,6 @@ async function handleSetQRCode(chatId, msg) {
         const response = await axios({ url, responseType: 'arraybuffer' });
         const buffer = Buffer.from(response.data);
         
-        // Save to MongoDB
         await saveQRCode(buffer, 'image/jpeg');
         qrCodeSet = true;
         
@@ -1040,7 +1037,7 @@ async function handleSetQRCode(chatId, msg) {
 }
 
 // ============================================================
-// ===== DATA BACKUP (Fixed null checks) =====
+// ===== DATA BACKUP =====
 // ============================================================
 
 async function handleDataBackup(chatId) {
@@ -1068,7 +1065,6 @@ async function handleDataBackup(chatId) {
         const filePath = path.join(__dirname, 'backup.json');
         fs.writeFileSync(filePath, json);
 
-        // Safely calculate lengths
         const protectedCount = backup.protected.numbers ? backup.protected.numbers.length : 0;
         const channelCount = (backup.channels.channels ? backup.channels.channels.length : 0) +
                             (backup.channels.private_channels ? backup.channels.private_channels.length : 0) +
@@ -1086,7 +1082,7 @@ async function handleDataBackup(chatId) {
 }
 
 // ============================================================
-// ===== BROADCAST SYSTEM (Without Header) =====
+// ===== BROADCAST SYSTEM =====
 // ============================================================
 
 async function handleBroadcast(chatId, msg) {
@@ -1159,7 +1155,6 @@ async function handleBroadcast(chatId, msg) {
             const targetId = user._id;
             
             try {
-                // Send without any prefix
                 switch (messageType) {
                     case 'text':
                         await bot.sendMessage(targetId, text, { 
@@ -1296,7 +1291,7 @@ async function handleBroadcast(chatId, msg) {
 }
 
 // ============================================================
-// ===== DIRECT MESSAGE USER (Fixed: forwardMessage) =====
+// ===== DIRECT MESSAGE USER =====
 // ============================================================
 
 async function handleDirectMessage(chatId) {
@@ -1381,7 +1376,6 @@ bot.onText(/\/start/, async (msg) => {
         return;
     }
 
-    // If referral code is pending, process it
     if (user.pending_ref_code) {
         const result = await processReferral(chatId, user.pending_ref_code);
         bot.sendMessage(chatId, result.success ? `🎉 ${result.msg}` : `❌ ${result.msg}`);
@@ -1449,10 +1443,8 @@ bot.on('message', async (msg) => {
                 await processDirectMessageStep(chatId, text);
                 return;
             } else if (state.step === 'ask_message') {
-                // Forward the admin's message to the target user
                 try {
                     const targetUserId = state.userId;
-                    // Use forwardMessage instead of sendCopy (works for all media)
                     await bot.forwardMessage(targetUserId, chatId, msg.message_id);
                     bot.sendMessage(chatId, `✅ Message forwarded to user <code>${targetUserId}</code>`, { parse_mode: 'HTML' });
                     adminDirectMessageState.delete(chatId);
@@ -1507,7 +1499,6 @@ bot.on('message', async (msg) => {
             return bot.sendMessage(chatId, result.msg, { parse_mode: 'HTML' });
         }
         
-        // Get QR from DB
         const qr = await getQRCode();
         if (!qr) {
             return bot.sendMessage(chatId, '❌ Payment QR code not configured yet. Please contact admin.');
@@ -1825,6 +1816,7 @@ bot.on('message', async (msg) => {
         }
 
         if (text === '➕ ADD PROTECTED') {
+            // Set state for admin to add protected number
             userStates.set(chatId, { state: 'admin_add_protected' });
             bot.sendMessage(chatId, '🛡️ Send 10-digit number to protect (free for admin):');
             return;
@@ -2038,11 +2030,18 @@ bot.on('message', async (msg) => {
             return;
         }
 
+        // ===== ADMIN: ADD PROTECTED (FIXED) =====
         if (state.state === 'admin_add_protected') {
             const phone = input.replace(/\D/g, '');
-            if (phone.length !== 10) return bot.sendMessage(chatId, '❌ Invalid number. Must be 10 digits.');
-            await addProtected(phone, 'admin');
-            bot.sendMessage(chatId, `✅ ${phone} added to protected list (admin).`);
+            if (phone.length !== 10) {
+                return bot.sendMessage(chatId, '❌ Invalid number. Must be 10 digits.');
+            }
+            const added = await addProtected(phone, 'admin');
+            if (added) {
+                bot.sendMessage(chatId, `✅ ${phone} added to protected list (admin).`);
+            } else {
+                bot.sendMessage(chatId, `⚠️ ${phone} is already protected.`);
+            }
             userStates.delete(chatId);
             return;
         }
@@ -2240,7 +2239,7 @@ bot.on('callback_query', async (callbackQuery) => {
         return;
     }
 
-    // ===== PROTECTION APPROVAL =====
+    // ===== PROTECTION APPROVAL (FIXED) =====
     if (data.startsWith('approve_protect_')) {
         if (!ADMIN_IDS.includes(Number(chatId))) {
             return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only!', show_alert: true });
@@ -2257,14 +2256,16 @@ bot.on('callback_query', async (callbackQuery) => {
         const phone = protection.phone;
         
         try {
+            // Add to protected list
             const added = await addProtected(phone, userId);
             if (!added) {
-                return bot.editMessageText('❌ Number already protected or error.', { chat_id: chatId, message_id: msgId });
+                return bot.editMessageText(`❌ Number ${phone} is already protected or error.`, { chat_id: chatId, message_id: msgId });
             }
             
             protection.status = 'approved';
             pendingProtections.set(payId, protection);
 
+            // Notify user
             try {
                 await bot.sendMessage(userId,
                     `🛡️ <b>Number Protection Approved!</b>\n\n` +
@@ -2275,6 +2276,7 @@ bot.on('callback_query', async (callbackQuery) => {
                 );
             } catch (e) {}
 
+            // Update admin message
             await bot.editMessageText(
                 `✅ <b>Protection Approved!</b>\n\n` +
                 `👤 User: ${protection.userId}\n` +
@@ -2284,6 +2286,7 @@ bot.on('callback_query', async (callbackQuery) => {
                 { chat_id: chatId, message_id: msgId, parse_mode: 'HTML' }
             );
 
+            // Remove from pending
             pendingProtections.delete(payId);
 
         } catch (error) {
