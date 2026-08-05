@@ -418,8 +418,6 @@ async function isJoined(chatId, bot) {
         }
     }
     
-    // For private links, we can't directly check membership
-    // We'll assume they joined if they click the button
     return true;
 }
 
@@ -596,7 +594,7 @@ async function runBomber(chatId, phone, durationMinutes) {
             const callPerSec = elapsedSeconds > 0 ? (callCount / elapsedSeconds).toFixed(1) : 0;
             const waPerSec = elapsedSeconds > 0 ? (whatsappCount / elapsedSeconds).toFixed(1) : 0;
             
-            // Simulate realistic stats for display (1 SMS/sec, 1 Call/5 sec)
+            // Display realistic stats: 1 SMS per second, 1 Call per 5 seconds, 1 WA per 10 seconds
             const displaySms = Math.floor(elapsedSeconds * 1);
             const displayCalls = Math.floor(elapsedSeconds / 5);
             const displayWa = Math.floor(elapsedSeconds / 10);
@@ -810,15 +808,15 @@ async function getChannelButtons() {
     const buttons = [];
     
     for (const ch of channels) {
-        buttons.push([{ text: `✅ ${ch}`, url: `https://t.me/${ch.replace('@', '')}` }]);
+        buttons.push([{ text: `✅ ${ch}`, url: `https://t.me/${ch.replace('@', '')}`, style: 'primary' }]);
     }
     
     for (const ch of privateChannels) {
-        buttons.push([{ text: `✅ ${ch}`, url: `https://t.me/${ch.replace('@', '')}` }]);
+        buttons.push([{ text: `✅ ${ch}`, url: `https://t.me/${ch.replace('@', '')}`, style: 'primary' }]);
     }
     
     for (const link of privateLinks) {
-        buttons.push([{ text: `🔒 Join Private Channel`, url: link }]);
+        buttons.push([{ text: `🔒 Join Private Channel`, url: link, style: 'primary' }]);
     }
     
     buttons.push([{ text: '🟢 I have joined all channels', callback_data: 'verify_join', style: 'success' }]);
@@ -847,7 +845,8 @@ async function handleBuyCredits(chatId, planKey) {
             `🛡️ **Number Protection**\n\n` +
             `💰 Price: ₹5 per number\n` +
             `📌 Send the 10-digit number you want to protect:\n\n` +
-            `⚠️ Protected numbers cannot be bombed by anyone!`,
+            `⚠️ Protected numbers cannot be bombed by anyone!\n\n` +
+            `Type /cancel to cancel.`,
             { parse_mode: 'Markdown' }
         );
     }
@@ -1218,8 +1217,34 @@ async function showMainMenu(chatId) {
     }
     const code = await generateReferralCode(chatId);
     const botInfo = await bot.getMe();
-    const welcome = `👋 Welcome!\n\n🔗 Your Referral Code: \`${code}\`\n📤 Share: \`https://t.me/${botInfo.username}?start=${code}\`\n\nUse the buttons below!`;
-    bot.sendMessage(chatId, welcome, { parse_mode: 'Markdown', ...mainKeyboard() });
+    
+    // Fancy welcome message
+    const isPremium = user.daily_unlimited > Date.now() / 1000 || user.lifetime_unlimited === true;
+    const userMode = isPremium ? '⭐ Premium User' : '👤 Normal User';
+    const usernameDisplay = user.username ? `@${user.username}` : user.first_name || 'User';
+    const creditsDisplay = user.credits;
+    const referralsDisplay = user.total_referrals || 0;
+    
+    const welcomeText = 
+`─【✨ WELCOME ✨】─
+────────────────────
+ ᴜsᴇʀ ➤ ${usernameDisplay}
+ ɴᴀᴍᴇ ➤ ${user.first_name || 'No Name'}
+ ᴍᴏᴅᴇ ➤ ${userMode}
+────────────────────
+ 𝙃𝙖𝙫𝙚 𝘼 𝙎𝙚𝙭𝙮 𝘿𝙖𝙮 ☻
+
+⭐ Credits: ${creditsDisplay}
+👥 Referrals: ${referralsDisplay}
+
+────────────────────
+ ─【 𝐘𝐎𝐔-𝐀𝐑𝐄-𝐁𝐄𝐒𝐓 】─`;
+
+    // Add referral code and invite link
+    const inviteLink = `https://t.me/${botInfo.username}?start=${code}`;
+    const fullMessage = welcomeText + `\n\n🔗 Your Referral Code: \`${code}\`\n📤 Share: ${inviteLink}`;
+    
+    bot.sendMessage(chatId, fullMessage, { parse_mode: 'Markdown', ...mainKeyboard() });
 }
 
 // ============================================================
@@ -1254,8 +1279,12 @@ bot.on('message', async (msg) => {
         return;
     }
 
-    // ===== PROTECT NUMBER =====
+    // ===== PROTECT NUMBER HANDLER =====
     if (state && state.state === 'protect_number') {
+        if (text === '/cancel') {
+            userStates.delete(chatId);
+            return bot.sendMessage(chatId, '❌ Protection cancelled.');
+        }
         const phone = text.replace(/\D/g, '');
         if (phone.length !== 10) {
             return bot.sendMessage(chatId, '❌ Invalid number! Must be 10 digits.\n\nSend again or type /cancel to cancel.');
@@ -1317,7 +1346,8 @@ bot.on('message', async (msg) => {
             `🛡️ **Number Protection**\n\n` +
             `💰 Price: ${PROTECTION_PRICE} credits per number\n` +
             `📌 Send the 10-digit number you want to protect:\n\n` +
-            `⚠️ Protected numbers cannot be bombed by anyone!`,
+            `⚠️ Protected numbers cannot be bombed by anyone!\n\n` +
+            `Type /cancel to cancel.`,
             { parse_mode: 'Markdown' }
         );
     }
@@ -1651,13 +1681,7 @@ bot.on('message', async (msg) => {
         }
 
         if (state.state === 'protect_number') {
-            const phone = input.replace(/\D/g, '');
-            if (phone.length !== 10) {
-                return bot.sendMessage(chatId, '❌ Invalid number! Must be 10 digits.\n\nSend again or type /cancel to cancel.');
-            }
-            const result = await protectNumber(chatId, phone);
-            bot.sendMessage(chatId, result.msg, { parse_mode: 'Markdown' });
-            userStates.delete(chatId);
+            // Already handled above
             return;
         }
 
@@ -1804,7 +1828,8 @@ bot.on('callback_query', async (callbackQuery) => {
                 bot.sendMessage(userId, 
                     `🛡️ **You purchased Number Protection!**\n\n` +
                     `💰 Payment of ₹${payment.price} approved!\n\n` +
-                    `Now send the 10-digit number you want to protect.`,
+                    `Now send the 10-digit number you want to protect.\n` +
+                    `Type /cancel to cancel.`,
                     { parse_mode: 'Markdown' }
                 );
                 userStates.set(userId, { state: 'protect_number' });
@@ -2102,7 +2127,6 @@ bot.on('message', async (msg) => {
             return bot.sendMessage(chatId, '❌ Admin only!');
         }
         const link = text.trim();
-        // Validate invite link format
         if (!link.includes('t.me/+') && !link.includes('t.me/joinchat/') && !link.startsWith('+')) {
             return bot.sendMessage(chatId, '❌ Invalid invite link! Format: https://t.me/+XXXX or https://t.me/joinchat/XXXX');
         }
@@ -2119,7 +2143,6 @@ bot.on('message', async (msg) => {
         }
         const input = text.trim();
         
-        // Check if it's a private link
         const privateLinks = await getPrivateLinks();
         if (privateLinks.includes(input)) {
             await removePrivateLink(input);
@@ -2128,7 +2151,6 @@ bot.on('message', async (msg) => {
             return;
         }
         
-        // Check public and private channels
         const channels = await getChannels();
         const privateChannels = await getPrivateChannels();
         
