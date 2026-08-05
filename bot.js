@@ -1,5 +1,5 @@
 // ============================================================
-// bot.js – ULTIMATE OTP Bomber Bot (FIXED)
+// bot.js – ULTIMATE OTP Bomber Bot (FINAL FIXED)
 // Only Main Keyboard Colored, Settings Removed
 // Channel Verification Shows Only Unjoined Channels
 // Protect Number Works with ₹5 Payment
@@ -178,7 +178,6 @@ async function protectNumberWithPayment(chatId, phone) {
         return { success: false, msg: `⚠️ Number ${phone} is already protected!` };
     }
     
-    // Store pending protection request
     const payId = Math.random().toString(36).substring(2, 10);
     pendingProtections.set(payId, {
         userId: chatId,
@@ -658,7 +657,6 @@ function mainKeyboard() {
                     { text: '💳 BUY CREDITS', style: 'success' },
                     { text: '🔗 REFERRAL', style: 'primary' }
                 ]
-                // ⚙️ SETTINGS REMOVED
             ],
             resize_keyboard: true,
             input_field_placeholder: 'Choose an option...'
@@ -689,7 +687,6 @@ function adminKeyboard() {
 // ===== INLINE KEYBOARDS =====
 // ============================================================
 
-// 1. DURATION BUTTONS (Bomb time selection)
 function getDurationButtons() {
     return {
         reply_markup: {
@@ -713,7 +710,6 @@ function getDurationButtons() {
     };
 }
 
-// 2. PAYMENT BUTTONS (Buy credits plans)
 function getPaymentButtons() {
     return {
         reply_markup: {
@@ -734,7 +730,6 @@ function getPaymentButtons() {
     };
 }
 
-// 3. APPROVAL BUTTONS (Admin payment approval)
 function getApprovalButtons(payId) {
     return {
         reply_markup: {
@@ -748,7 +743,6 @@ function getApprovalButtons(payId) {
     };
 }
 
-// 4. PROTECTION APPROVAL BUTTONS
 function getProtectionApprovalButtons(payId) {
     return {
         reply_markup: {
@@ -762,7 +756,6 @@ function getProtectionApprovalButtons(payId) {
     };
 }
 
-// 5. CHANNEL MANAGER BUTTONS
 function getChannelManagerButtons() {
     return {
         reply_markup: {
@@ -778,7 +771,6 @@ function getChannelManagerButtons() {
     };
 }
 
-// 6. CHANNEL JOIN BUTTONS - Shows only unjoined channels
 async function getChannelJoinButtons(chatId) {
     const result = await checkChannelJoin(chatId, bot);
     
@@ -788,7 +780,6 @@ async function getChannelJoinButtons(chatId) {
     
     const buttons = [];
     
-    // Show only unjoined channels with join buttons
     for (const channel of result.unjoined) {
         buttons.push([{ 
             text: `🔴 ${channel} (Not Joined)`, 
@@ -796,7 +787,6 @@ async function getChannelJoinButtons(chatId) {
         }]);
     }
     
-    // Private links
     for (const link of result.privateLinks) {
         buttons.push([{ 
             text: `🔒 Join Private Channel`, 
@@ -804,7 +794,6 @@ async function getChannelJoinButtons(chatId) {
         }]);
     }
     
-    // Verified button
     buttons.push([{ 
         text: '🟢 I have joined all channels', 
         callback_data: 'verify_join',
@@ -1262,17 +1251,20 @@ bot.onText(/\/start/, async (msg) => {
         return;
     }
 
-    await showMainMenu(chatId);
-});
-
-async function showMainMenu(chatId) {
-    const user = await getUser(chatId);
+    // If referral code is pending, process it
     if (user.pending_ref_code) {
         const result = await processReferral(chatId, user.pending_ref_code);
         bot.sendMessage(chatId, result.success ? `🎉 ${result.msg}` : `❌ ${result.msg}`);
         user.pending_ref_code = null;
         await user.save();
     }
+
+    await showMainMenu(chatId);
+});
+
+async function showMainMenu(chatId) {
+    const user = await getUser(chatId);
+    
     const code = await generateReferralCode(chatId);
     const botInfo = await bot.getMe();
     
@@ -1366,7 +1358,6 @@ bot.on('message', async (msg) => {
             return bot.sendMessage(chatId, '❌ Payment QR code not configured yet. Please contact admin.');
         }
         
-        // Send QR code for protection payment
         try {
             await bot.sendPhoto(chatId, qrCodePath, { 
                 caption: result.msg,
@@ -1831,12 +1822,10 @@ bot.on('message', async (msg) => {
         }
 
         if (state.state === 'protect_number') {
-            // Already handled above
             return;
         }
 
         if (state.state === 'protection_screenshot') {
-            // Already handled above
             return;
         }
 
@@ -1917,7 +1906,6 @@ bot.on('message', async (msg) => {
         }
 
         if (state.state === 'allusers') {
-            // Already handled in callback
             return;
         }
     }
@@ -1936,6 +1924,7 @@ bot.on('callback_query', async (callbackQuery) => {
         const result = await checkChannelJoin(chatId, bot);
         if (result.joined) {
             await bot.editMessageText('✅ You have joined all channels! Access granted.', { chat_id: chatId, message_id: msgId });
+            // Show welcome menu directly - no referral message
             await showMainMenu(chatId);
         } else {
             const keyboard = await getChannelJoinButtons(chatId);
