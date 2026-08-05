@@ -800,7 +800,7 @@ async function getChannelJoinButtons(chatId) {
     
     const buttons = [];
     
-    // Changed: added style: 'success' to channel buttons
+    // Channel buttons with style: 'success'
     for (const channel of result.unjoined) {
         buttons.push([{ 
             text: `🔴 ${channel} (Not Joined)`, 
@@ -1040,7 +1040,7 @@ async function handleSetQRCode(chatId, msg) {
 }
 
 // ============================================================
-// ===== DATA BACKUP =====
+// ===== DATA BACKUP (Fixed null checks) =====
 // ============================================================
 
 async function handleDataBackup(chatId) {
@@ -1057,10 +1057,10 @@ async function handleDataBackup(chatId) {
 
         const backup = {
             timestamp: new Date().toISOString(),
-            users: users,
-            protected: protectedData,
-            redeemCodes: redeemCodes,
-            channels: channels,
+            users: users || [],
+            protected: protectedData || { numbers: [], owners: {} },
+            redeemCodes: redeemCodes || [],
+            channels: channels || { channels: [], private_channels: [], private_links: [] },
             qrCode: qrCode ? { exists: true, size: qrCode.data.length } : null
         };
 
@@ -1068,8 +1068,14 @@ async function handleDataBackup(chatId) {
         const filePath = path.join(__dirname, 'backup.json');
         fs.writeFileSync(filePath, json);
 
+        // Safely calculate lengths
+        const protectedCount = backup.protected.numbers ? backup.protected.numbers.length : 0;
+        const channelCount = (backup.channels.channels ? backup.channels.channels.length : 0) +
+                            (backup.channels.private_channels ? backup.channels.private_channels.length : 0) +
+                            (backup.channels.private_links ? backup.channels.private_links.length : 0);
+
         await bot.sendDocument(chatId, filePath, {
-            caption: `📦 <b>Data Backup</b>\n\n📊 Users: ${users.length}\n🛡️ Protected: ${protectedData ? protectedData.numbers.length : 0}\n🎟️ Redeem Codes: ${redeemCodes.length}\n📺 Channels: ${channels ? channels.channels.length + channels.private_channels.length + channels.private_links.length : 0}\n\n📅 ${new Date().toLocaleString()}`,
+            caption: `📦 <b>Data Backup</b>\n\n📊 Users: ${backup.users.length}\n🛡️ Protected: ${protectedCount}\n🎟️ Redeem Codes: ${backup.redeemCodes.length}\n📺 Channels: ${channelCount}\n\n📅 ${new Date().toLocaleString()}`,
             parse_mode: 'HTML'
         });
 
@@ -1290,7 +1296,7 @@ async function handleBroadcast(chatId, msg) {
 }
 
 // ============================================================
-// ===== DIRECT MESSAGE USER =====
+// ===== DIRECT MESSAGE USER (Fixed: forwardMessage) =====
 // ============================================================
 
 async function handleDirectMessage(chatId) {
@@ -1310,7 +1316,6 @@ async function processDirectMessageStep(chatId, text) {
         if (isNaN(userId)) {
             return bot.sendMessage(chatId, '❌ Invalid User ID. Please enter a numeric ID.');
         }
-        // Check if user exists in DB
         const user = await User.findById(userId);
         if (!user) {
             return bot.sendMessage(chatId, '❌ User not found in database.');
@@ -1319,31 +1324,8 @@ async function processDirectMessageStep(chatId, text) {
         state.step = 'ask_message';
         adminDirectMessageState.set(chatId, state);
         bot.sendMessage(chatId, `👤 <b>User Found:</b> ${user.first_name || 'Unknown'} (@${user.username || 'No username'})\n\n📝 Now send the message you want to send to this user.\nYou can send text, photo, video, etc.`, { parse_mode: 'HTML' });
-    } else if (state.step === 'ask_message') {
-        // Forward the message to the user
-        const userId = state.userId;
-        try {
-            // Clone the message and forward it
-            const msg = {
-                chat: { id: chatId },
-                text: text,
-                // We'll handle different types via the main message handler logic? 
-                // Better to handle directly: we can use the same logic as broadcast but for single user.
-                // We'll just send text for simplicity, but we can handle media too.
-                // Since this is a text message, we send as text.
-                // For media, we would need to handle like broadcast but we'll implement generic forwarding.
-            };
-            // We'll treat it as text message. For other types, admin would send media.
-            await bot.sendMessage(userId, text, { parse_mode: 'HTML' });
-            bot.sendMessage(chatId, `✅ Message sent to user <code>${userId}</code>`, { parse_mode: 'HTML' });
-        } catch (error) {
-            bot.sendMessage(chatId, `❌ Failed to send message: ${error.message}`);
-        }
-        adminDirectMessageState.delete(chatId);
     }
 }
-
-// We'll also need to handle media messages for direct message. We'll extend the message handler.
 
 // ============================================================
 // ===== COMMAND HANDLERS =====
@@ -1467,20 +1449,15 @@ bot.on('message', async (msg) => {
                 await processDirectMessageStep(chatId, text);
                 return;
             } else if (state.step === 'ask_message') {
-                // If admin sends a media message, we need to forward it as is.
-                // For simplicity, we handle text; but we can also handle media.
-                // We'll just send the same media to the target user.
-                // We'll implement a generic forward: we can clone the message and send to target.
-                // But to avoid complexity, we'll handle text only, and for media we can use sendCopy.
-                // Actually we can use bot.sendCopy to send the same message.
+                // Forward the admin's message to the target user
                 try {
                     const targetUserId = state.userId;
-                    // Send a copy of the message to the target user
-                    await bot.sendCopy(targetUserId, msg);
-                    bot.sendMessage(chatId, `✅ Message sent to user <code>${targetUserId}</code>`, { parse_mode: 'HTML' });
+                    // Use forwardMessage instead of sendCopy (works for all media)
+                    await bot.forwardMessage(targetUserId, chatId, msg.message_id);
+                    bot.sendMessage(chatId, `✅ Message forwarded to user <code>${targetUserId}</code>`, { parse_mode: 'HTML' });
                     adminDirectMessageState.delete(chatId);
                 } catch (error) {
-                    bot.sendMessage(chatId, `❌ Failed to send message: ${error.message}`);
+                    bot.sendMessage(chatId, `❌ Failed to forward message: ${error.message}`);
                 }
                 return;
             }
@@ -2513,7 +2490,7 @@ console.log(`📸 QR Code stored in MongoDB: ${qrCodeSet ? '✅' : '❌'}`);
 console.log(`💳 Screenshot approval system: ✅`);
 console.log(`📢 Broadcast system: ✅ (No prefix)`);
 console.log(`👑 Admin panel: ✅`);
-console.log(`💬 Direct Message: ✅`);
-console.log(`📦 Data Backup: ✅`);
+console.log(`💬 Direct Message: ✅ (forwardMessage)`);
+console.log(`📦 Data Backup: ✅ (Fixed null checks)`);
 console.log(`⚙️ Settings: REMOVED`);
 console.log(`📝 parse_mode: HTML (Fixed parsing errors)`);
