@@ -1,9 +1,5 @@
 // ============================================================
-// bot.js – ULTIMATE OTP Bomber Bot (COMPLETE FIXED)
-// Only Main Keyboard Colored, Settings Removed
-// Channel Verification Shows Only Unjoined Channels
-// Protect Number Works with ₹5 Payment (QR + Screenshot)
-// parse_mode: HTML (Fixes Markdown parsing errors)
+// bot.js – ULTIMATE OTP Bomber Bot (FINAL WITH ALL FIXES)
 // ============================================================
 
 const TelegramBot = require('node-telegram-bot-api');
@@ -21,9 +17,9 @@ const BOT_TOKEN = "8212356485:AAGeN3peo9uHPG8eCLFRuWjs12hCVC-jNs4";
 const ADMIN_IDS = [6346250222];
 
 const API_URLS = {
-    api1: 'https://api-server-padj.onrender.com',
+    api1: 'https://api-server-mey8.onrender.com',
     api2: 'https://api-server-fy8w.onrender.com',
-    api3: 'https://api-server-mey8.onrender.com',
+    api3: 'https://api-server-padj.onrender.com',
     api4: 'https://api-server-0abv.onrender.com',
     api5: 'https://wasataap-call-api.onrender.com'
 };
@@ -92,6 +88,13 @@ const channelSchema = new mongoose.Schema({
     private_links: { type: Array, default: [] }
 });
 const Channel = mongoose.model('Channel', channelSchema);
+
+// QR Code storage schema
+const qrCodeSchema = new mongoose.Schema({
+    data: { type: String, required: true }, // base64 string
+    mimeType: { type: String, default: 'image/jpeg' }
+});
+const QrCode = mongoose.model('QrCode', qrCodeSchema);
 
 // ============================================================
 // ===== DATABASE FUNCTIONS =====
@@ -398,6 +401,23 @@ async function checkChannelJoin(chatId, bot) {
 }
 
 // ============================================================
+// ===== QR CODE FUNCTIONS (MongoDB) =====
+// ============================================================
+
+async function getQRCode() {
+    const doc = await QrCode.findOne();
+    if (!doc) return null;
+    return { data: Buffer.from(doc.data, 'base64'), mimeType: doc.mimeType };
+}
+
+async function saveQRCode(buffer, mimeType = 'image/jpeg') {
+    const base64 = buffer.toString('base64');
+    await QrCode.deleteMany({}); // remove old
+    const doc = new QrCode({ data: base64, mimeType });
+    await doc.save();
+}
+
+// ============================================================
 // ===== MEMORY MANAGEMENT =====
 // ============================================================
 
@@ -459,9 +479,9 @@ const pendingPayments = new Map();
 const pendingScreenshots = new Map();
 const pendingProtections = new Map();
 const adminBroadcastState = new Map();
+const adminDirectMessageState = new Map();
 
-let qrCodePath = path.join(__dirname, 'qr_code.jpg');
-let qrCodeSet = false;
+let qrCodeSet = false; // will be set after checking DB
 
 // ============================================================
 // ===== FAST BOMBING ENGINE =====
@@ -633,7 +653,6 @@ function getDurationText(minutes) {
 // ===== KEYBOARDS =====
 // ============================================================
 
-// ===== MAIN KEYBOARD – WITH STYLE (ONLY THIS ONE) =====
 function mainKeyboard() {
     return {
         reply_markup: {
@@ -665,7 +684,6 @@ function mainKeyboard() {
     };
 }
 
-// ===== ADMIN KEYBOARD – NO STYLE, JUST EMOJIS =====
 function adminKeyboard() {
     return {
         reply_markup: {
@@ -677,7 +695,8 @@ function adminKeyboard() {
                 ['📋 PROTECTED LIST', '📢 BROADCAST'],
                 ['📋 ALL USERS', '🔄 UNLIMITED PLAN'],
                 ['📺 CHANNEL MANAGER', '📸 SET QR CODE'],
-                ['💳 PAYMENT APPROVAL', '🔙 BACK']
+                ['💳 PAYMENT APPROVAL', '💬 MESSAGE USER'],
+                ['📦 DATA BACKUP', '🔙 BACK']
             ],
             resize_keyboard: true
         }
@@ -781,17 +800,20 @@ async function getChannelJoinButtons(chatId) {
     
     const buttons = [];
     
+    // Changed: added style: 'success' to channel buttons
     for (const channel of result.unjoined) {
         buttons.push([{ 
             text: `🔴 ${channel} (Not Joined)`, 
-            url: `https://t.me/${channel.replace('@', '')}` 
+            url: `https://t.me/${channel.replace('@', '')}`,
+            style: 'success'
         }]);
     }
     
     for (const link of result.privateLinks) {
         buttons.push([{ 
             text: `🔒 Join Private Channel`, 
-            url: link 
+            url: link,
+            style: 'success'
         }]);
     }
     
@@ -832,7 +854,9 @@ async function handleBuyCredits(chatId, planKey) {
         );
     }
 
-    if (!qrCodeSet) {
+    // Get QR from DB
+    const qr = await getQRCode();
+    if (!qr) {
         return bot.sendMessage(chatId, '❌ Payment QR code not configured yet. Please contact admin.');
     }
 
@@ -845,7 +869,7 @@ async function handleBuyCredits(chatId, planKey) {
         `📸 <b>After payment, send screenshot!</b>`;
 
     try {
-        await bot.sendPhoto(chatId, qrCodePath, { 
+        await bot.sendPhoto(chatId, qr.data, { 
             caption: caption,
             parse_mode: 'HTML'
         });
@@ -982,7 +1006,7 @@ async function handleProtectionScreenshot(chatId, msg, payId) {
 }
 
 // ============================================================
-// ===== QR CODE SET HANDLER =====
+// ===== QR CODE SET HANDLER (Now saves to MongoDB) =====
 // ============================================================
 
 async function handleSetQRCode(chatId, msg) {
@@ -999,18 +1023,14 @@ async function handleSetQRCode(chatId, msg) {
         const file = await bot.getFile(photo.file_id);
         const url = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
         
-        const response = await axios({ url, responseType: 'stream' });
-        const writer = fs.createWriteStream(qrCodePath);
-        response.data.pipe(writer);
+        const response = await axios({ url, responseType: 'arraybuffer' });
+        const buffer = Buffer.from(response.data);
         
-        writer.on('finish', () => {
-            qrCodeSet = true;
-            bot.sendMessage(chatId, '✅ <b>QR Code saved successfully!</b>\n\nUsers will now see this QR code when buying credits.', { parse_mode: 'HTML' });
-        });
+        // Save to MongoDB
+        await saveQRCode(buffer, 'image/jpeg');
+        qrCodeSet = true;
         
-        writer.on('error', (err) => {
-            bot.sendMessage(chatId, `❌ Failed to save QR code: ${err.message}`);
-        });
+        bot.sendMessage(chatId, '✅ <b>QR Code saved successfully to database!</b>\n\nUsers will now see this QR code when buying credits.\nThis QR code will persist across restarts.', { parse_mode: 'HTML' });
         
         userStates.delete(chatId);
         
@@ -1020,7 +1040,47 @@ async function handleSetQRCode(chatId, msg) {
 }
 
 // ============================================================
-// ===== BROADCAST SYSTEM =====
+// ===== DATA BACKUP =====
+// ============================================================
+
+async function handleDataBackup(chatId) {
+    if (!ADMIN_IDS.includes(Number(chatId))) {
+        return bot.sendMessage(chatId, '❌ Admin only!');
+    }
+
+    try {
+        const users = await User.find({}).lean();
+        const protectedData = await Protected.findOne({}).lean();
+        const redeemCodes = await Redeem.find({}).lean();
+        const channels = await Channel.findOne({}).lean();
+        const qrCode = await QrCode.findOne({}).lean();
+
+        const backup = {
+            timestamp: new Date().toISOString(),
+            users: users,
+            protected: protectedData,
+            redeemCodes: redeemCodes,
+            channels: channels,
+            qrCode: qrCode ? { exists: true, size: qrCode.data.length } : null
+        };
+
+        const json = JSON.stringify(backup, null, 2);
+        const filePath = path.join(__dirname, 'backup.json');
+        fs.writeFileSync(filePath, json);
+
+        await bot.sendDocument(chatId, filePath, {
+            caption: `📦 <b>Data Backup</b>\n\n📊 Users: ${users.length}\n🛡️ Protected: ${protectedData ? protectedData.numbers.length : 0}\n🎟️ Redeem Codes: ${redeemCodes.length}\n📺 Channels: ${channels ? channels.channels.length + channels.private_channels.length + channels.private_links.length : 0}\n\n📅 ${new Date().toLocaleString()}`,
+            parse_mode: 'HTML'
+        });
+
+        fs.unlinkSync(filePath);
+    } catch (error) {
+        bot.sendMessage(chatId, `❌ Backup failed: ${error.message}`);
+    }
+}
+
+// ============================================================
+// ===== BROADCAST SYSTEM (Without Header) =====
 // ============================================================
 
 async function handleBroadcast(chatId, msg) {
@@ -1093,41 +1153,48 @@ async function handleBroadcast(chatId, msg) {
             const targetId = user._id;
             
             try {
+                // Send without any prefix
                 switch (messageType) {
                     case 'text':
-                        await bot.sendMessage(targetId, 
-                            `📢 <b>BROADCAST</b>\n\n${text}`, 
-                            { parse_mode: 'HTML', disable_web_page_preview: true, timeout: 10000 }
-                        );
+                        await bot.sendMessage(targetId, text, { 
+                            parse_mode: 'HTML', 
+                            disable_web_page_preview: true, 
+                            timeout: 10000 
+                        });
                         break;
                     case 'photo':
                         await bot.sendPhoto(targetId, mediaId, { 
-                            caption: caption ? `📢 <b>BROADCAST</b>\n\n${caption}` : '📢 <b>BROADCAST</b>',
-                            parse_mode: 'HTML', timeout: 10000
+                            caption: caption || undefined,
+                            parse_mode: 'HTML', 
+                            timeout: 10000 
                         });
                         break;
                     case 'video':
                         await bot.sendVideo(targetId, mediaId, { 
-                            caption: caption ? `📢 <b>BROADCAST</b>\n\n${caption}` : '📢 <b>BROADCAST</b>',
-                            parse_mode: 'HTML', timeout: 10000
+                            caption: caption || undefined,
+                            parse_mode: 'HTML', 
+                            timeout: 10000 
                         });
                         break;
                     case 'document':
                         await bot.sendDocument(targetId, mediaId, { 
-                            caption: caption ? `📢 <b>BROADCAST</b>\n\n${caption}` : '📢 <b>BROADCAST</b>',
-                            parse_mode: 'HTML', timeout: 10000
+                            caption: caption || undefined,
+                            parse_mode: 'HTML', 
+                            timeout: 10000 
                         });
                         break;
                     case 'audio':
                         await bot.sendAudio(targetId, mediaId, { 
-                            caption: caption ? `📢 <b>BROADCAST</b>\n\n${caption}` : '📢 <b>BROADCAST</b>',
-                            parse_mode: 'HTML', timeout: 10000
+                            caption: caption || undefined,
+                            parse_mode: 'HTML', 
+                            timeout: 10000 
                         });
                         break;
                     case 'voice':
                         await bot.sendVoice(targetId, mediaId, { 
-                            caption: caption ? `📢 <b>BROADCAST</b>\n\n${caption}` : '📢 <b>BROADCAST</b>',
-                            parse_mode: 'HTML', timeout: 10000
+                            caption: caption || undefined,
+                            parse_mode: 'HTML', 
+                            timeout: 10000 
                         });
                         break;
                     case 'sticker':
@@ -1135,12 +1202,34 @@ async function handleBroadcast(chatId, msg) {
                         break;
                     case 'animation':
                         await bot.sendAnimation(targetId, mediaId, { 
-                            caption: caption ? `📢 <b>BROADCAST</b>\n\n${caption}` : '📢 <b>BROADCAST</b>',
-                            parse_mode: 'HTML', timeout: 10000
+                            caption: caption || undefined,
+                            parse_mode: 'HTML', 
+                            timeout: 10000 
+                        });
+                        break;
+                    case 'video_note':
+                        await bot.sendVideoNote(targetId, mediaId, { timeout: 10000 });
+                        break;
+                    case 'poll':
+                        await bot.sendPoll(targetId, msg.poll.question, msg.poll.options.map(o => o.text), {
+                            is_anonymous: msg.poll.is_anonymous,
+                            type: msg.poll.type,
+                            allows_multiple_answers: msg.poll.allows_multiple_answers,
+                            timeout: 10000
+                        });
+                        break;
+                    case 'location':
+                        await bot.sendLocation(targetId, msg.location.latitude, msg.location.longitude, { timeout: 10000 });
+                        break;
+                    case 'contact':
+                        await bot.sendContact(targetId, msg.contact.phone_number, msg.contact.first_name, {
+                            last_name: msg.contact.last_name || '',
+                            vcard: msg.contact.vcard || '',
+                            timeout: 10000
                         });
                         break;
                     default:
-                        await bot.sendMessage(targetId, `📢 <b>BROADCAST</b>\n\nPlease check the channel for updates.`, { parse_mode: 'HTML' });
+                        await bot.sendMessage(targetId, `📢 Please check the channel for updates.`, { parse_mode: 'HTML' });
                 }
                 success++;
             } catch (error) {
@@ -1199,6 +1288,62 @@ async function handleBroadcast(chatId, msg) {
         adminBroadcastState.delete(chatId);
     }
 }
+
+// ============================================================
+// ===== DIRECT MESSAGE USER =====
+// ============================================================
+
+async function handleDirectMessage(chatId) {
+    if (!ADMIN_IDS.includes(Number(chatId))) {
+        return bot.sendMessage(chatId, '❌ Admin only!');
+    }
+    adminDirectMessageState.set(chatId, { step: 'ask_id' });
+    bot.sendMessage(chatId, '💬 <b>Send User ID</b>\n\nEnter the Telegram User ID of the user you want to message.', { parse_mode: 'HTML' });
+}
+
+async function processDirectMessageStep(chatId, text) {
+    const state = adminDirectMessageState.get(chatId);
+    if (!state) return;
+
+    if (state.step === 'ask_id') {
+        const userId = parseInt(text);
+        if (isNaN(userId)) {
+            return bot.sendMessage(chatId, '❌ Invalid User ID. Please enter a numeric ID.');
+        }
+        // Check if user exists in DB
+        const user = await User.findById(userId);
+        if (!user) {
+            return bot.sendMessage(chatId, '❌ User not found in database.');
+        }
+        state.userId = userId;
+        state.step = 'ask_message';
+        adminDirectMessageState.set(chatId, state);
+        bot.sendMessage(chatId, `👤 <b>User Found:</b> ${user.first_name || 'Unknown'} (@${user.username || 'No username'})\n\n📝 Now send the message you want to send to this user.\nYou can send text, photo, video, etc.`, { parse_mode: 'HTML' });
+    } else if (state.step === 'ask_message') {
+        // Forward the message to the user
+        const userId = state.userId;
+        try {
+            // Clone the message and forward it
+            const msg = {
+                chat: { id: chatId },
+                text: text,
+                // We'll handle different types via the main message handler logic? 
+                // Better to handle directly: we can use the same logic as broadcast but for single user.
+                // We'll just send text for simplicity, but we can handle media too.
+                // Since this is a text message, we send as text.
+                // For media, we would need to handle like broadcast but we'll implement generic forwarding.
+            };
+            // We'll treat it as text message. For other types, admin would send media.
+            await bot.sendMessage(userId, text, { parse_mode: 'HTML' });
+            bot.sendMessage(chatId, `✅ Message sent to user <code>${userId}</code>`, { parse_mode: 'HTML' });
+        } catch (error) {
+            bot.sendMessage(chatId, `❌ Failed to send message: ${error.message}`);
+        }
+        adminDirectMessageState.delete(chatId);
+    }
+}
+
+// We'll also need to handle media messages for direct message. We'll extend the message handler.
 
 // ============================================================
 // ===== COMMAND HANDLERS =====
@@ -1314,6 +1459,34 @@ bot.on('message', async (msg) => {
 
     const user = await getUser(chatId);
 
+    // ===== DIRECT MESSAGE HANDLER =====
+    if (adminDirectMessageState.has(chatId) && ADMIN_IDS.includes(Number(chatId))) {
+        const state = adminDirectMessageState.get(chatId);
+        if (state) {
+            if (state.step === 'ask_id' && text) {
+                await processDirectMessageStep(chatId, text);
+                return;
+            } else if (state.step === 'ask_message') {
+                // If admin sends a media message, we need to forward it as is.
+                // For simplicity, we handle text; but we can also handle media.
+                // We'll just send the same media to the target user.
+                // We'll implement a generic forward: we can clone the message and send to target.
+                // But to avoid complexity, we'll handle text only, and for media we can use sendCopy.
+                // Actually we can use bot.sendCopy to send the same message.
+                try {
+                    const targetUserId = state.userId;
+                    // Send a copy of the message to the target user
+                    await bot.sendCopy(targetUserId, msg);
+                    bot.sendMessage(chatId, `✅ Message sent to user <code>${targetUserId}</code>`, { parse_mode: 'HTML' });
+                    adminDirectMessageState.delete(chatId);
+                } catch (error) {
+                    bot.sendMessage(chatId, `❌ Failed to send message: ${error.message}`);
+                }
+                return;
+            }
+        }
+    }
+
     // ===== SMART BROADCAST =====
     if (adminBroadcastState.has(chatId) && ADMIN_IDS.includes(Number(chatId))) {
         const state = adminBroadcastState.get(chatId);
@@ -1357,12 +1530,14 @@ bot.on('message', async (msg) => {
             return bot.sendMessage(chatId, result.msg, { parse_mode: 'HTML' });
         }
         
-        if (!qrCodeSet) {
+        // Get QR from DB
+        const qr = await getQRCode();
+        if (!qr) {
             return bot.sendMessage(chatId, '❌ Payment QR code not configured yet. Please contact admin.');
         }
         
         try {
-            await bot.sendPhoto(chatId, qrCodePath, { 
+            await bot.sendPhoto(chatId, qr.data, { 
                 caption: result.msg,
                 parse_mode: 'HTML'
             });
@@ -1459,7 +1634,7 @@ bot.on('message', async (msg) => {
         if (!ADMIN_IDS.includes(Number(chatId))) {
             return bot.sendMessage(chatId, '❌ Admin only!');
         }
-        bot.sendMessage(chatId, '📸 <b>Send QR Code Photo</b>\n\nSend a photo to set as payment QR code.', { parse_mode: 'HTML' });
+        bot.sendMessage(chatId, '📸 <b>Send QR Code Photo</b>\n\nSend a photo to set as payment QR code. This will be stored in database and persist across restarts.', { parse_mode: 'HTML' });
         userStates.set(chatId, { state: 'set_qr' });
         return;
     }
@@ -1703,7 +1878,7 @@ bot.on('message', async (msg) => {
             adminBroadcastState.set(chatId, { active: true });
             bot.sendMessage(chatId, 
                 `📢 <b>Broadcast Mode Activated</b>\n\n` +
-                `Send any message (text, photo, video, GIF, etc.) and I'll send it to ALL users!\n\n` +
+                `Send any message (text, photo, video, GIF, etc.) and I'll send it to ALL users without any prefix.\n\n` +
                 `Send /cancel to exit.`,
                 { parse_mode: 'HTML' }
             );
@@ -1751,6 +1926,16 @@ bot.on('message', async (msg) => {
                 parse_mode: 'HTML',
                 reply_markup: keyboard.reply_markup 
             });
+            return;
+        }
+
+        if (text === '💬 MESSAGE USER') {
+            await handleDirectMessage(chatId);
+            return;
+        }
+
+        if (text === '📦 DATA BACKUP') {
+            await handleDataBackup(chatId);
             return;
         }
     }
@@ -1927,7 +2112,6 @@ bot.on('callback_query', async (callbackQuery) => {
         const result = await checkChannelJoin(chatId, bot);
         if (result.joined) {
             await bot.editMessageText('✅ You have joined all channels! Access granted.', { chat_id: chatId, message_id: msgId });
-            // Show welcome menu directly - no referral message
             await showMainMenu(chatId);
         } else {
             const keyboard = await getChannelJoinButtons(chatId);
@@ -2096,7 +2280,10 @@ bot.on('callback_query', async (callbackQuery) => {
         const phone = protection.phone;
         
         try {
-            await addProtected(phone, userId);
+            const added = await addProtected(phone, userId);
+            if (!added) {
+                return bot.editMessageText('❌ Number already protected or error.', { chat_id: chatId, message_id: msgId });
+            }
             
             protection.status = 'approved';
             pendingProtections.set(payId, protection);
@@ -2269,6 +2456,20 @@ bot.on('callback_query', async (callbackQuery) => {
 });
 
 // ============================================================
+// ===== INIT – CHECK QR CODE IN DB =====
+// ============================================================
+
+(async () => {
+    const qr = await getQRCode();
+    if (qr) {
+        qrCodeSet = true;
+        console.log('✅ QR Code found in database.');
+    } else {
+        console.log('⚠️ No QR Code in database. Admin can set one.');
+    }
+})();
+
+// ============================================================
 // ===== HEALTH CHECK SERVER =====
 // ============================================================
 
@@ -2308,9 +2509,11 @@ console.log(`🛡️ Number Protection: ₹${PROTECTION_PRICE} (Payment via QR)`
 console.log(`🔗 Private Links: SUPPORTED`);
 console.log(`📊 Per-Second Stats: ACTIVE (Updates every 5s)`);
 console.log(`👥 Referral System: ACTIVE (Admin notified)`);
-console.log(`📸 QR Code payment system: ${qrCodeSet ? '✅' : '❌'}`);
+console.log(`📸 QR Code stored in MongoDB: ${qrCodeSet ? '✅' : '❌'}`);
 console.log(`💳 Screenshot approval system: ✅`);
-console.log(`📢 Broadcast system: ✅`);
+console.log(`📢 Broadcast system: ✅ (No prefix)`);
 console.log(`👑 Admin panel: ✅`);
+console.log(`💬 Direct Message: ✅`);
+console.log(`📦 Data Backup: ✅`);
 console.log(`⚙️ Settings: REMOVED`);
 console.log(`📝 parse_mode: HTML (Fixed parsing errors)`);
