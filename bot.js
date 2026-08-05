@@ -1,6 +1,7 @@
 // ============================================================
 // bot.js – ULTIMATE OTP Bomber Bot
 // Only Main Keyboard Colored, Others Normal
+// ALL INLINE KEYBOARDS FIXED & WORKING
 // ============================================================
 
 const TelegramBot = require('node-telegram-bot-api');
@@ -677,41 +678,34 @@ function adminKeyboard() {
 }
 
 // ============================================================
-// ===== INLINE KEYBOARDS – NO STYLE, JUST EMOJIS =====
+// ===== INLINE KEYBOARDS – FIXED =====
 // ============================================================
 
-function getColorfulDurationButtons() {
+// 1. DURATION BUTTONS (Bomb time selection)
+function getDurationButtons() {
     return {
         reply_markup: {
             inline_keyboard: [
-                ['🟢 1 Min', '🔵 2 Min', '🔵 3 Min'],
-                ['🔵 5 Min', '🔴 10 Min', '🔵 30 Min'],
-                ['🟢 60 Min', '⭐ 1 Day (100 coins)']
-            ].map(row => row.map(label => ({ text: label, callback_data: 'dur_' + label.split(' ')[0] })))
+                [
+                    { text: '🟢 1 Min', callback_data: 'dur_1' },
+                    { text: '🔵 2 Min', callback_data: 'dur_2' },
+                    { text: '🔵 3 Min', callback_data: 'dur_3' }
+                ],
+                [
+                    { text: '🔵 5 Min', callback_data: 'dur_5' },
+                    { text: '🔴 10 Min', callback_data: 'dur_10' },
+                    { text: '🔵 30 Min', callback_data: 'dur_30' }
+                ],
+                [
+                    { text: '🟢 60 Min', callback_data: 'dur_60' },
+                    { text: '⭐ 1 Day (100 coins)', callback_data: 'dur_1440' }
+                ]
+            ]
         }
     };
 }
 
-// Actually need to map correctly with callback_data. Let's do properly.
-function getDurationButtons() {
-    const durations = [
-        ['🟢 1 Min', 1],
-        ['🔵 2 Min', 2],
-        ['🔵 3 Min', 3],
-        ['🔵 5 Min', 5],
-        ['🔴 10 Min', 10],
-        ['🔵 30 Min', 30],
-        ['🟢 60 Min', 60],
-        ['⭐ 1 Day (100 coins)', 1440]
-    ];
-    const rows = [];
-    for (let i = 0; i < durations.length; i += 3) {
-        const row = durations.slice(i, i+3).map(([text, val]) => ({ text, callback_data: `dur_${val}` }));
-        rows.push(row);
-    }
-    return { reply_markup: { inline_keyboard: rows } };
-}
-
+// 2. PAYMENT BUTTONS (Buy credits plans)
 function getPaymentButtons() {
     return {
         reply_markup: {
@@ -732,6 +726,7 @@ function getPaymentButtons() {
     };
 }
 
+// 3. APPROVAL BUTTONS (Admin payment approval)
 function getApprovalButtons(payId) {
     return {
         reply_markup: {
@@ -745,6 +740,7 @@ function getApprovalButtons(payId) {
     };
 }
 
+// 4. CHANNEL MANAGER BUTTONS
 function getChannelManagerButtons() {
     return {
         reply_markup: {
@@ -760,10 +756,20 @@ function getChannelManagerButtons() {
     };
 }
 
-// ============================================================
-// ===== CHANNEL JOIN BUTTONS (NO STYLE) =====
-// ============================================================
+// 5. SETTINGS BUTTONS
+function getSettingsButtons() {
+    return {
+        reply_markup: {
+            inline_keyboard: [
+                [{ text: '📋 View Settings', callback_data: 'settings_view' }],
+                [{ text: '🔍 Add Scanner', callback_data: 'settings_add_scanner' }],
+                [{ text: '📝 Modify Headers', callback_data: 'settings_modify_headers' }]
+            ]
+        }
+    };
+}
 
+// 6. CHANNEL JOIN BUTTONS
 async function getChannelButtons() {
     const channels = await getChannels();
     const privateChannels = await getPrivateChannels();
@@ -1159,7 +1165,7 @@ bot.onText(/\/start/, async (msg) => {
             const keyboard = await getChannelButtons();
             bot.sendMessage(
                 chatId,
-                `🚫 **Please join our channel(s) first!**\n\nRequired channels:\n${allChannels.join('\n')}\n${privateLinks.length > 0 ? '\n🔒 Private Channel Links:\n' + privateLinks.join('\n') : ''}\n\nAfter joining all channels, click the green button below.`,
+                `🚫 **Please join our channel(s) first!**\n\nRequired channels:\n${allChannels.join('\n')}\n${privateLinks.length > 0 ? '\n🔒 Private Channel Links:\n' + privateLinks.join('\n') : ''}\n\nAfter joining all channels, click the button below.`,
                 { parse_mode: 'Markdown', reply_markup: keyboard }
             );
         } else {
@@ -1474,15 +1480,7 @@ bot.on('message', async (msg) => {
 
     // ===== SETTINGS =====
     if (text === '⚙️ SETTINGS') {
-        const keyboard = {
-            reply_markup: {
-                inline_keyboard: [
-                    [{ text: '📋 View Settings', callback_data: 'settings_view' }],
-                    [{ text: '🔍 Add Scanner', callback_data: 'settings_add_scanner' }],
-                    [{ text: '📝 Modify Headers', callback_data: 'settings_modify_headers' }]
-                ]
-            }
-        };
+        const keyboard = getSettingsButtons();
         bot.sendMessage(chatId, '⚙️ **Settings Panel**', { parse_mode: 'Markdown', reply_markup: keyboard });
         return;
     }
@@ -1629,16 +1627,6 @@ bot.on('message', async (msg) => {
             bot.sendMessage(chatId, '📺 **Channel Manager**\n\nManage public channels, private channels, and private invite links.', { reply_markup: keyboard });
             return;
         }
-
-        if (text === '📸 SET QR CODE') {
-            // Already handled above
-            return;
-        }
-
-        if (text === '💳 PAYMENT APPROVAL') {
-            // Already handled above
-            return;
-        }
     }
 
     // ===== START BOMB =====
@@ -1696,7 +1684,7 @@ bot.on('message', async (msg) => {
             
             userStates.set(chatId, { phone: phone });
             const keyboard = getDurationButtons();
-            bot.sendMessage(chatId, `📱 Target: \`${phone}\`\n⏱️ **Select Bombing Duration:**\n\n📞 Voice/WA will run continuously`, 
+            bot.sendMessage(chatId, `📱 Target: \`${phone}\`\n⏱️ **Select Bombing Duration:**`, 
                 { parse_mode: 'Markdown', reply_markup: keyboard });
             return;
         }
