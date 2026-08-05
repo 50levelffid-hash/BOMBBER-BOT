@@ -1,6 +1,6 @@
 // ============================================================
 // bot.js – ULTIMATE OTP Bomber Bot
-// Admin Buttons Only Colored + Emojis
+// Only Main Keyboard Colored, Others Normal
 // ============================================================
 
 const TelegramBot = require('node-telegram-bot-api');
@@ -622,17 +622,34 @@ function getDurationText(minutes) {
 // ===== KEYBOARDS =====
 // ============================================================
 
-// MAIN KEYBOARD - NO STYLE, ONLY EMOJIS
+// ===== MAIN KEYBOARD – WITH STYLE (ONLY THIS ONE) =====
 function mainKeyboard() {
     return {
         reply_markup: {
             keyboard: [
-                ['🟢 START BOMB', '🔴 STOP BOMB'],
-                ['💰 MY CREDITS', '🎁 DAILY SPIN'],
-                ['🛡️ PROTECT NUMBER', '👑 ADMIN PANEL'],
-                ['📊 MY STATS', '❓ HELP'],
-                ['💳 BUY CREDITS', '🔗 REFERRAL'],
-                ['⚙️ SETTINGS']
+                [
+                    { text: '🟢 START BOMB', style: 'success' },
+                    { text: '🔴 STOP BOMB', style: 'danger' }
+                ],
+                [
+                    { text: '💰 MY CREDITS', style: 'primary' },
+                    { text: '🎁 DAILY SPIN', style: 'primary' }
+                ],
+                [
+                    { text: '🛡️ PROTECT NUMBER', style: 'primary' },
+                    { text: '👑 ADMIN PANEL', style: 'danger' }
+                ],
+                [
+                    { text: '📊 MY STATS', style: 'primary' },
+                    { text: '❓ HELP', style: 'primary' }
+                ],
+                [
+                    { text: '💳 BUY CREDITS', style: 'success' },
+                    { text: '🔗 REFERRAL', style: 'primary' }
+                ],
+                [
+                    { text: '⚙️ SETTINGS', style: 'primary' }
+                ]
             ],
             resize_keyboard: true,
             input_field_placeholder: 'Choose an option...'
@@ -640,43 +657,19 @@ function mainKeyboard() {
     };
 }
 
-// ADMIN KEYBOARD - WITH STYLE AND EMOJIS
+// ===== ADMIN KEYBOARD – NO STYLE, JUST EMOJIS =====
 function adminKeyboard() {
     return {
         reply_markup: {
             keyboard: [
-                [
-                    { text: '📊 STATS', style: 'primary' },
-                    { text: '👥 USERS LIST', style: 'primary' }
-                ],
-                [
-                    { text: '🎟️ GEN CODE', style: 'success' },
-                    { text: '🚫 BAN USER', style: 'danger' }
-                ],
-                [
-                    { text: '✅ UNBAN USER', style: 'success' },
-                    { text: '💰 ADD CREDITS', style: 'success' }
-                ],
-                [
-                    { text: '➕ ADD PROTECTED', style: 'primary' },
-                    { text: '➖ REMOVE PROTECTED', style: 'danger' }
-                ],
-                [
-                    { text: '📋 PROTECTED LIST', style: 'primary' },
-                    { text: '📢 BROADCAST', style: 'primary' }
-                ],
-                [
-                    { text: '📋 ALL USERS', style: 'primary' },
-                    { text: '🔄 UNLIMITED PLAN', style: 'success' }
-                ],
-                [
-                    { text: '📺 CHANNEL MANAGER', style: 'primary' },
-                    { text: '📸 SET QR CODE', style: 'primary' }
-                ],
-                [
-                    { text: '💳 PAYMENT APPROVAL', style: 'success' },
-                    { text: '🔙 BACK', style: 'danger' }
-                ]
+                ['📊 STATS', '👥 USERS LIST'],
+                ['🎟️ GEN CODE', '🚫 BAN USER'],
+                ['✅ UNBAN USER', '💰 ADD CREDITS'],
+                ['➕ ADD PROTECTED', '➖ REMOVE PROTECTED'],
+                ['📋 PROTECTED LIST', '📢 BROADCAST'],
+                ['📋 ALL USERS', '🔄 UNLIMITED PLAN'],
+                ['📺 CHANNEL MANAGER', '📸 SET QR CODE'],
+                ['💳 PAYMENT APPROVAL', '🔙 BACK']
             ],
             resize_keyboard: true
         }
@@ -684,30 +677,39 @@ function adminKeyboard() {
 }
 
 // ============================================================
-// ===== INLINE KEYBOARDS (with style - they work fine) =====
+// ===== INLINE KEYBOARDS – NO STYLE, JUST EMOJIS =====
 // ============================================================
 
 function getColorfulDurationButtons() {
     return {
         reply_markup: {
             inline_keyboard: [
-                [
-                    { text: '🟢 1 Min', callback_data: 'dur_1', style: 'success' },
-                    { text: '🔵 2 Min', callback_data: 'dur_2', style: 'primary' },
-                    { text: '🔵 3 Min', callback_data: 'dur_3', style: 'primary' }
-                ],
-                [
-                    { text: '🔵 5 Min', callback_data: 'dur_5', style: 'primary' },
-                    { text: '🔴 10 Min', callback_data: 'dur_10', style: 'danger' },
-                    { text: '🔵 30 Min', callback_data: 'dur_30', style: 'primary' }
-                ],
-                [
-                    { text: '🟢 60 Min', callback_data: 'dur_60', style: 'success' },
-                    { text: '⭐ 1 Day (100 coins)', callback_data: 'dur_1440', style: 'primary' }
-                ]
-            ]
+                ['🟢 1 Min', '🔵 2 Min', '🔵 3 Min'],
+                ['🔵 5 Min', '🔴 10 Min', '🔵 30 Min'],
+                ['🟢 60 Min', '⭐ 1 Day (100 coins)']
+            ].map(row => row.map(label => ({ text: label, callback_data: 'dur_' + label.split(' ')[0] })))
         }
     };
+}
+
+// Actually need to map correctly with callback_data. Let's do properly.
+function getDurationButtons() {
+    const durations = [
+        ['🟢 1 Min', 1],
+        ['🔵 2 Min', 2],
+        ['🔵 3 Min', 3],
+        ['🔵 5 Min', 5],
+        ['🔴 10 Min', 10],
+        ['🔵 30 Min', 30],
+        ['🟢 60 Min', 60],
+        ['⭐ 1 Day (100 coins)', 1440]
+    ];
+    const rows = [];
+    for (let i = 0; i < durations.length; i += 3) {
+        const row = durations.slice(i, i+3).map(([text, val]) => ({ text, callback_data: `dur_${val}` }));
+        rows.push(row);
+    }
+    return { reply_markup: { inline_keyboard: rows } };
 }
 
 function getPaymentButtons() {
@@ -715,15 +717,15 @@ function getPaymentButtons() {
         reply_markup: {
             inline_keyboard: [
                 [
-                    { text: '🔵 10 Credits – ₹20', callback_data: 'buy_10', style: 'primary' },
-                    { text: '🟢 25 Credits – ₹40', callback_data: 'buy_25', style: 'success' }
+                    { text: '🔵 10 Credits – ₹20', callback_data: 'buy_10' },
+                    { text: '🟢 25 Credits – ₹40', callback_data: 'buy_25' }
                 ],
                 [
-                    { text: '🟢 1 Day Unlimited – ₹50', callback_data: 'buy_unlimited', style: 'success' },
-                    { text: '⭐ Lifetime Unlimited – ₹400', callback_data: 'buy_lifetime', style: 'primary' }
+                    { text: '🟢 1 Day Unlimited – ₹50', callback_data: 'buy_unlimited' },
+                    { text: '⭐ Lifetime Unlimited – ₹400', callback_data: 'buy_lifetime' }
                 ],
                 [
-                    { text: '🛡️ Protect Number – ₹5', callback_data: 'buy_protect', style: 'primary' }
+                    { text: '🛡️ Protect Number – ₹5', callback_data: 'buy_protect' }
                 ]
             ]
         }
@@ -735,8 +737,8 @@ function getApprovalButtons(payId) {
         reply_markup: {
             inline_keyboard: [
                 [
-                    { text: '✅ Approve', callback_data: `approve_pay_${payId}`, style: 'success' },
-                    { text: '❌ Reject', callback_data: `reject_pay_${payId}`, style: 'danger' }
+                    { text: '✅ Approve', callback_data: `approve_pay_${payId}` },
+                    { text: '❌ Reject', callback_data: `reject_pay_${payId}` }
                 ]
             ]
         }
@@ -747,19 +749,19 @@ function getChannelManagerButtons() {
     return {
         reply_markup: {
             inline_keyboard: [
-                [{ text: '➕ Add Public Channel', callback_data: 'channel_add_public', style: 'primary' }],
-                [{ text: '🔒 Add Private Channel', callback_data: 'channel_add_private', style: 'primary' }],
-                [{ text: '🔗 Add Private Link', callback_data: 'channel_add_link', style: 'primary' }],
-                [{ text: '➖ Remove Channel/Link', callback_data: 'channel_remove', style: 'danger' }],
-                [{ text: '📋 View Channels/Links', callback_data: 'channel_view', style: 'primary' }],
-                [{ text: '🔙 Back to Admin', callback_data: 'admin_back', style: 'danger' }]
+                [{ text: '➕ Add Public Channel', callback_data: 'channel_add_public' }],
+                [{ text: '🔒 Add Private Channel', callback_data: 'channel_add_private' }],
+                [{ text: '🔗 Add Private Link', callback_data: 'channel_add_link' }],
+                [{ text: '➖ Remove Channel/Link', callback_data: 'channel_remove' }],
+                [{ text: '📋 View Channels/Links', callback_data: 'channel_view' }],
+                [{ text: '🔙 Back to Admin', callback_data: 'admin_back' }]
             ]
         }
     };
 }
 
 // ============================================================
-// ===== CHANNEL BUTTONS =====
+// ===== CHANNEL JOIN BUTTONS (NO STYLE) =====
 // ============================================================
 
 async function getChannelButtons() {
@@ -781,7 +783,7 @@ async function getChannelButtons() {
         buttons.push([{ text: `🔒 Join Private Channel`, url: link }]);
     }
     
-    buttons.push([{ text: '🟢 I have joined all channels', callback_data: 'verify_join', style: 'success' }]);
+    buttons.push([{ text: '🟢 I have joined all channels', callback_data: 'verify_join' }]);
     return { inline_keyboard: buttons };
 }
 
@@ -1475,9 +1477,9 @@ bot.on('message', async (msg) => {
         const keyboard = {
             reply_markup: {
                 inline_keyboard: [
-                    [{ text: '📋 View Settings', callback_data: 'settings_view', style: 'primary' }],
-                    [{ text: '🔍 Add Scanner', callback_data: 'settings_add_scanner', style: 'primary' }],
-                    [{ text: '📝 Modify Headers', callback_data: 'settings_modify_headers', style: 'primary' }]
+                    [{ text: '📋 View Settings', callback_data: 'settings_view' }],
+                    [{ text: '🔍 Add Scanner', callback_data: 'settings_add_scanner' }],
+                    [{ text: '📝 Modify Headers', callback_data: 'settings_modify_headers' }]
                 ]
             }
         };
@@ -1604,8 +1606,8 @@ bot.on('message', async (msg) => {
                 const markup = totalPages > 1 ? {
                     reply_markup: {
                         inline_keyboard: [
-                            ...(pageNum > 0 ? [{ text: '◀️ Prev', callback_data: `allusers_${pageNum-1}`, style: 'primary' }] : []),
-                            ...(pageNum < totalPages-1 ? [{ text: 'Next ▶️', callback_data: `allusers_${pageNum+1}`, style: 'primary' }] : [])
+                            ...(pageNum > 0 ? [{ text: '◀️ Prev', callback_data: `allusers_${pageNum-1}` }] : []),
+                            ...(pageNum < totalPages-1 ? [{ text: 'Next ▶️', callback_data: `allusers_${pageNum+1}` }] : [])
                         ]
                     }
                 } : undefined;
@@ -1693,7 +1695,7 @@ bot.on('message', async (msg) => {
             }
             
             userStates.set(chatId, { phone: phone });
-            const keyboard = getColorfulDurationButtons();
+            const keyboard = getDurationButtons();
             bot.sendMessage(chatId, `📱 Target: \`${phone}\`\n⏱️ **Select Bombing Duration:**\n\n📞 Voice/WA will run continuously`, 
                 { parse_mode: 'Markdown', reply_markup: keyboard });
             return;
@@ -2046,8 +2048,8 @@ bot.on('callback_query', async (callbackQuery) => {
             const markup = totalPages > 1 ? {
                 reply_markup: {
                     inline_keyboard: [
-                        ...(page > 0 ? [{ text: '◀️ Prev', callback_data: `allusers_${page-1}`, style: 'primary' }] : []),
-                        ...(page < state.totalPages-1 ? [{ text: 'Next ▶️', callback_data: `allusers_${page+1}`, style: 'primary' }] : [])
+                        ...(page > 0 ? [{ text: '◀️ Prev', callback_data: `allusers_${page-1}` }] : []),
+                        ...(page < state.totalPages-1 ? [{ text: 'Next ▶️', callback_data: `allusers_${page+1}` }] : [])
                     ]
                 }
             } : undefined;
@@ -2083,7 +2085,7 @@ app.get('/health', (req, res) => {
         apiInstances: Object.keys(API_URLS).length,
         api5Type: 'Voice & WhatsApp Only',
         features: {
-            colorfulButtons: true,
+            colorfulMainKeyboard: true,
             botApiVersion: '7.4+',
             lifetimeUnlimited: true,
             referralSystem: true,
@@ -2103,7 +2105,7 @@ app.listen(PORT, '0.0.0.0', () => {
 console.log('🤖 ULTIMATE Bot started successfully!');
 console.log(`📡 Load Balancer: FAST MODE ACTIVE`);
 console.log(`🌐 API Instances: 5`);
-console.log(`🎨 Colorful Admin Buttons: ACTIVE (Bot API 7.4+)`);
+console.log(`🎨 Colorful Main Keyboard: ACTIVE (Bot API 7.4+)`);
 console.log(`⭐ Plans: 1 Day (₹50) | Lifetime (₹400)`);
 console.log(`🛡️ Number Protection: ${PROTECTION_PRICE} credits`);
 console.log(`🔗 Private Links: SUPPORTED`);
