@@ -1,5 +1,6 @@
 // ============================================================
-// bot.js – FAST OTP Bomber Bot with Load Balancing + API5
+// bot.js – ULTIMATE OTP Bomber Bot with Latest Features
+// Telegram Bot API Latest + Colorful Buttons + Optimized
 // ============================================================
 
 const TelegramBot = require('node-telegram-bot-api');
@@ -51,6 +52,7 @@ const userSchema = new mongoose.Schema({
     total_attacks: { type: Number, default: 0 },
     last_daily: { type: Number, default: 0 },
     daily_unlimited: { type: Number, default: 0 },
+    lifetime_unlimited: { type: Boolean, default: false },
     bomb_sessions: { type: Array, default: [] },
     pending_ref_code: { type: String, default: null },
     referrer: { type: Number, default: null },
@@ -59,7 +61,8 @@ const userSchema = new mongoose.Schema({
     last_ref_used: { type: Number, default: 0 },
     scanner_enabled: { type: Boolean, default: false },
     custom_headers: { type: Object, default: {} },
-    banned: { type: Boolean, default: false }
+    banned: { type: Boolean, default: false },
+    total_referrals: { type: Number, default: 0 }
 });
 
 const User = mongoose.model('User', userSchema);
@@ -79,7 +82,8 @@ const redeemSchema = new mongoose.Schema({
 const Redeem = mongoose.model('Redeem', redeemSchema);
 
 const channelSchema = new mongoose.Schema({
-    channels: { type: Array, default: [] }
+    channels: { type: Array, default: [] },
+    private_channels: { type: Array, default: [] }
 });
 const Channel = mongoose.model('Channel', channelSchema);
 
@@ -173,27 +177,47 @@ async function getRedeemCode(code) {
 async function getChannels() {
     let doc = await Channel.findOne();
     if (!doc) {
-        doc = new Channel({ channels: [] });
+        doc = new Channel({ channels: [], private_channels: [] });
         await doc.save();
     }
     return doc.channels;
 }
 
-async function addChannel(channel) {
+async function getPrivateChannels() {
     let doc = await Channel.findOne();
     if (!doc) {
-        doc = new Channel({ channels: [] });
-    }
-    if (!doc.channels.includes(channel)) {
-        doc.channels.push(channel);
+        doc = new Channel({ channels: [], private_channels: [] });
         await doc.save();
+    }
+    return doc.private_channels;
+}
+
+async function addChannel(channel, isPrivate = false) {
+    let doc = await Channel.findOne();
+    if (!doc) {
+        doc = new Channel({ channels: [], private_channels: [] });
+    }
+    if (isPrivate) {
+        if (!doc.private_channels.includes(channel)) {
+            doc.private_channels.push(channel);
+            await doc.save();
+        }
+    } else {
+        if (!doc.channels.includes(channel)) {
+            doc.channels.push(channel);
+            await doc.save();
+        }
     }
 }
 
-async function removeChannel(channel) {
+async function removeChannel(channel, isPrivate = false) {
     let doc = await Channel.findOne();
     if (doc) {
-        doc.channels = doc.channels.filter(c => c !== channel);
+        if (isPrivate) {
+            doc.private_channels = doc.private_channels.filter(c => c !== channel);
+        } else {
+            doc.channels = doc.channels.filter(c => c !== channel);
+        }
         await doc.save();
     }
 }
@@ -256,7 +280,39 @@ async function processReferral(userId, code) {
     
     if (!referrer.referrals) referrer.referrals = [];
     referrer.referrals.push(userId);
+    referrer.total_referrals = (referrer.total_referrals || 0) + 1;
     await referrer.save();
+    
+    // Send notification to referrer
+    try {
+        const referrerUser = await getUser(referrer._id);
+        await bot.sendMessage(referrer._id,
+            `🎉 **New Referral Success!**\n\n` +
+            `👤 New User: @${user.username || 'No username'}\n` +
+            `🆔 User ID: \`${userId}\`\n` +
+            `⭐ Credits Earned: +5\n\n` +
+            `📊 Your Total Credits: ${referrerUser.credits}\n` +
+            `📊 Your Total Referrals: ${referrer.total_referrals || 0}`,
+            { parse_mode: 'Markdown' }
+        );
+    } catch (e) {}
+
+    // Send notification to admin
+    for (const adminId of ADMIN_IDS) {
+        try {
+            await bot.sendMessage(adminId,
+                `👥 **New Referral Success!**\n\n` +
+                `👤 Referrer: @${referrer.username || 'No username'}\n` +
+                `👤 New User: @${user.username || 'No username'}\n` +
+                `🆔 Referrer ID: \`${referrer._id}\`\n` +
+                `🆔 New User ID: \`${userId}\`\n` +
+                `⭐ Credits Earned: 5\n\n` +
+                `📊 Referrer Total Credits: ${referrer.credits}\n` +
+                `📊 Referrer Total Referrals: ${referrer.total_referrals || 0}`,
+                { parse_mode: 'Markdown' }
+            );
+        } catch (e) {}
+    }
     
     return { success: true, msg: '✅ You got 5 credits! Your referrer also got 5 credits!' };
 }
@@ -271,9 +327,12 @@ async function getReferralData(userId) {
 
 async function isJoined(chatId, bot) {
     const channels = await getChannels();
-    if (channels.length === 0) return true;
+    const privateChannels = await getPrivateChannels();
+    const allChannels = [...channels, ...privateChannels];
     
-    for (const channel of channels) {
+    if (allChannels.length === 0) return true;
+    
+    for (const channel of allChannels) {
         try {
             const member = await bot.getChatMember(channel, chatId);
             if (member.status === 'left' || member.status === 'kicked') {
@@ -323,29 +382,19 @@ let apiCycleCounter = 0;
 const API_NAMES = ['api1', 'api2', 'api3', 'api4', 'api5'];
 
 function getApiForDuration(duration, cycleCount) {
-    // ===== FAST MODE =====
-    // Always use MULTIPLE APIs simultaneously for speed
-    
-    // 1 minute: ALL APIs (Maximum Speed)
     if (duration <= 1) {
         return ['api1', 'api2', 'api3', 'api4', 'api5'];
     }
-    // 2-5 minutes: 3 APIs (Fast)
     if (duration <= 5) {
-        const apis = ['api1', 'api2', 'api5'];
-        return apis;
+        return ['api1', 'api2', 'api5'];
     }
-    // 5-10 minutes: 3 APIs (Fast)
     if (duration <= 10) {
-        const apis = ['api2', 'api3', 'api5'];
-        return apis;
+        return ['api2', 'api3', 'api5'];
     }
-    // 10-60 minutes: 2 APIs + API5 (Balanced)
     if (duration <= 60) {
         const mainApi = API_NAMES[cycleCount % 3];
         return [mainApi, 'api5'];
     }
-    // Fallback: 2 APIs
     return [API_NAMES[cycleCount % 4], 'api5'];
 }
 
@@ -372,12 +421,11 @@ async function sendBombRequest(apiName, phone, duration) {
     if (!url) return null;
     
     try {
-        // ⚡ Reduced timeout for faster response
         const response = await axios.post(`${url}/bomb`, {
             phone,
             duration,
             instance: apiName
-        }, { timeout: 3000 }); // 5s se 3s kiya
+        }, { timeout: 3000 });
         return response.data;
     } catch (error) {
         return null;
@@ -399,7 +447,7 @@ async function runBomber(chatId, phone, durationMinutes) {
     bombingStatus.set(chatId, true);
 
     const user = await getUser(chatId);
-    const isUnlimited = user.daily_unlimited > Date.now() / 1000;
+    const isUnlimited = user.daily_unlimited > Date.now() / 1000 || user.lifetime_unlimited === true;
 
     if (!isUnlimited) {
         const cost = getBombCost(durationMinutes);
@@ -434,7 +482,7 @@ async function runBomber(chatId, phone, durationMinutes) {
     let totalSent = 0;
     let smsCount = 0, callCount = 0, whatsappCount = 0;
     let lastUpdate = Date.now();
-    const updateInterval = 1000; // 1 second update
+    const updateInterval = 5000; // 5 second update interval
     const startTime = Date.now() / 1000;
     const endTime = startTime + (durationMinutes === 1440 ? 86400 : durationMinutes * 60);
     let cycleCount = 0;
@@ -445,7 +493,6 @@ async function runBomber(chatId, phone, durationMinutes) {
         
         const apisToUse = getApiForDuration(durationMinutes, cycleCount);
         
-        // ⚡ Send ALL API requests in PARALLEL
         const promises = apisToUse.map(apiName => sendBombRequest(apiName, phone, durationMinutes));
         const results = await Promise.allSettled(promises);
         
@@ -467,22 +514,34 @@ async function runBomber(chatId, phone, durationMinutes) {
             lastUpdate = now;
             const timeLeft = isUnlimited ? '∞' : Math.floor(endTime - now / 1000);
             const timeLeftText = typeof timeLeft === 'number' ? `${Math.floor(timeLeft/60)}m ${timeLeft%60}s` : '∞';
+            
+            // Calculate per-second rates
+            const elapsedSeconds = (now / 1000) - startTime;
+            const smsPerSec = elapsedSeconds > 0 ? (smsCount / elapsedSeconds).toFixed(1) : 0;
+            const callPerSec = elapsedSeconds > 0 ? (callCount / elapsedSeconds).toFixed(1) : 0;
+            const waPerSec = elapsedSeconds > 0 ? (whatsappCount / elapsedSeconds).toFixed(1) : 0;
+            
             try {
                 await bot.editMessageText(
-                    `⚔️ **BOMBING IN PROGRESS**\n📱 Target: \`${phone}\`\n⏱️ Time Left: ${timeLeftText}\n📨 SMS: ${smsCount}\n📞 Calls: ${callCount}\n📱 WA: ${whatsappCount}\n🔄 Cycles: ${cycleCount}\n🌐 API: ${apisToUse.join('+')}\n📞 Voice/WA: API5 (Always Active)\n\n🔴 Use /stop to halt`,
+                    `⚔️ **BOMBING IN PROGRESS**\n📱 Target: \`${phone}\`\n⏱️ Time Left: ${timeLeftText}\n📨 SMS: ${smsCount} (${smsPerSec}/s)\n📞 Calls: ${callCount} (${callPerSec}/s)\n📱 WA: ${whatsappCount} (${waPerSec}/s)\n🔄 Cycles: ${cycleCount}\n🌐 API: ${apisToUse.join('+')}\n\n🔴 Use /stop to halt`,
                     { chat_id: chatId, message_id: msg.message_id, parse_mode: 'Markdown' }
                 );
             } catch (e) {}
         }
 
-        // ⚡ Reduced delay from 100ms to 20ms for faster cycling
         await new Promise(r => setTimeout(r, 20));
     }
 
     bombingStatus.set(chatId, false);
     const finalStatus = bombingStatus.get(chatId) === false ? 'STOPPED' : 'COMPLETED';
+    
+    const elapsedTotal = (Date.now() / 1000) - startTime;
+    const avgSms = elapsedTotal > 0 ? (smsCount / elapsedTotal).toFixed(1) : 0;
+    const avgCall = elapsedTotal > 0 ? (callCount / elapsedTotal).toFixed(1) : 0;
+    const avgWa = elapsedTotal > 0 ? (whatsappCount / elapsedTotal).toFixed(1) : 0;
+    
     await bot.editMessageText(
-        `✅ **BOMBING ${finalStatus}**\n📱 Target: \`${phone}\`\n📨 SMS: ${smsCount}\n📞 Calls: ${callCount}\n📱 WA: ${whatsappCount}\n🔄 Total Cycles: ${cycleCount}\n\n🟢 Use START BOMB to start again`,
+        `✅ **BOMBING ${finalStatus}**\n📱 Target: \`${phone}\`\n📨 SMS: ${smsCount} (Avg: ${avgSms}/s)\n📞 Calls: ${callCount} (Avg: ${avgCall}/s)\n📱 WA: ${whatsappCount} (Avg: ${avgWa}/s)\n🔄 Total Cycles: ${cycleCount}\n\n🟢 Use START BOMB to start again`,
         { chat_id: chatId, message_id: msg.message_id, parse_mode: 'Markdown' }
     );
 
@@ -517,7 +576,7 @@ function getDurationText(minutes) {
 }
 
 // ============================================================
-// ===== KEYBOARDS =====
+// ===== COLORFUL KEYBOARDS (Latest Telegram Features) =====
 // ============================================================
 
 function mainKeyboard() {
@@ -534,7 +593,8 @@ function mainKeyboard() {
                 ['💳 BUY CREDITS', '🔗 REFERRAL'],
                 ['⚙️ SETTINGS']
             ],
-            resize_keyboard: true
+            resize_keyboard: true,
+            input_field_placeholder: 'Choose an option...'
         }
     };
 }
@@ -559,13 +619,69 @@ function adminKeyboard() {
 }
 
 // ============================================================
+// ===== COLORFUL INLINE BUTTONS =====
+// ============================================================
+
+function getColorfulButtons() {
+    return {
+        inline_keyboard: [
+            [
+                { text: '🟢 1 Min', callback_data: 'dur_1' },
+                { text: '🔵 2 Min', callback_data: 'dur_2' },
+                { text: '🟣 3 Min', callback_data: 'dur_3' }
+            ],
+            [
+                { text: '🟠 5 Min', callback_data: 'dur_5' },
+                { text: '🔴 10 Min', callback_data: 'dur_10' },
+                { text: '🟡 30 Min', callback_data: 'dur_30' }
+            ],
+            [
+                { text: '🟢 60 Min', callback_data: 'dur_60' },
+                { text: '⭐ 1 Day (100 coins)', callback_data: 'dur_1440' }
+            ]
+        ]
+    };
+}
+
+function getPaymentButtons() {
+    return {
+        inline_keyboard: [
+            [
+                { text: '🔵 10 Credits – ₹20', callback_data: 'buy_10' },
+                { text: '🟢 25 Credits – ₹40', callback_data: 'buy_25' }
+            ],
+            [
+                { text: '🟠 1 Day Unlimited – ₹50', callback_data: 'buy_unlimited' },
+                { text: '⭐ Lifetime Unlimited – ₹400', callback_data: 'buy_lifetime' }
+            ]
+        ]
+    };
+}
+
+function getApprovalButtons(payId) {
+    return {
+        inline_keyboard: [
+            [
+                { text: '✅ Approve', callback_data: `approve_pay_${payId}` },
+                { text: '❌ Reject', callback_data: `reject_pay_${payId}` }
+            ]
+        ]
+    };
+}
+
+// ============================================================
 // ===== CHANNEL BUTTONS =====
 // ============================================================
 
 async function getChannelButtons() {
     const channels = await getChannels();
-    const buttons = channels.map(ch => {
-        return [{ text: `✅ ${ch}`, url: `https://t.me/${ch.replace('@', '')}` }];
+    const privateChannels = await getPrivateChannels();
+    const allChannels = [...channels, ...privateChannels];
+    
+    const buttons = allChannels.map(ch => {
+        const isPrivate = privateChannels.includes(ch);
+        const url = isPrivate ? `https://t.me/${ch.replace('@', '')}` : `https://t.me/${ch.replace('@', '')}`;
+        return [{ text: `✅ ${ch}`, url: url }];
     });
     buttons.push([{ text: '🟢 I have joined all channels', callback_data: 'verify_join' }]);
     return { inline_keyboard: buttons };
@@ -578,9 +694,8 @@ async function getChannelButtons() {
 const PAYMENT_PLANS = {
     '10': { credits: 10, price: 20, label: '10 Credits – ₹20' },
     '25': { credits: 25, price: 40, label: '25 Credits – ₹40' },
-    '50': { credits: 50, price: 70, label: '50 Credits – ₹70' },
-    '100': { credits: 100, price: 120, label: '100 Credits – ₹120' },
-    'unlimited': { credits: 0, price: 150, label: '⭐ 1 Day Unlimited – ₹150' }
+    'unlimited': { credits: 0, price: 50, label: '⭐ 1 Day Unlimited – ₹50' },
+    'lifetime': { credits: 0, price: 400, label: '⭐ Lifetime Unlimited – ₹400', lifetime: true }
 };
 
 async function handleBuyCredits(chatId, planKey) {
@@ -637,6 +752,7 @@ async function handlePaymentScreenshot(chatId, msg) {
         plan: planKey,
         credits: plan.credits,
         price: plan.price,
+        lifetime: plan.lifetime || false,
         photoUrl: url,
         fileId: photo.file_id,
         timestamp: Date.now(),
@@ -651,14 +767,7 @@ async function handlePaymentScreenshot(chatId, msg) {
         `🆔 Pay ID: \`${payId}\`\n\n` +
         `Approve or Reject:`;
 
-    const approvalKeyboard = {
-        inline_keyboard: [
-            [
-                { text: '✅ Approve', callback_data: `approve_pay_${payId}` },
-                { text: '❌ Reject', callback_data: `reject_pay_${payId}` }
-            ]
-        ]
-    };
+    const approvalKeyboard = getApprovalButtons(payId);
 
     for (const adminId of ADMIN_IDS) {
         try {
@@ -930,11 +1039,13 @@ bot.onText(/\/start/, async (msg) => {
     const joined = await isJoined(chatId, bot);
     if (!joined) {
         const channels = await getChannels();
-        if (channels.length > 0) {
+        const privateChannels = await getPrivateChannels();
+        const allChannels = [...channels, ...privateChannels];
+        if (allChannels.length > 0) {
             const keyboard = await getChannelButtons();
             bot.sendMessage(
                 chatId,
-                `🚫 **Please join our channel(s) first!**\n\nRequired channels:\n${channels.join('\n')}\n\nAfter joining all channels, click the green button below.`,
+                `🚫 **Please join our channel(s) first!**\n\nRequired channels:\n${allChannels.join('\n')}\n\nAfter joining all channels, click the green button below.`,
                 { parse_mode: 'Markdown', reply_markup: keyboard }
             );
         } else {
@@ -1031,25 +1142,18 @@ bot.on('message', async (msg) => {
 
     // ===== BUY CREDITS =====
     if (text === '💳 BUY CREDITS') {
-        const keyboard = {
-            inline_keyboard: [
-                [{ text: '10 Credits – ₹20', callback_data: 'buy_10' }],
-                [{ text: '25 Credits – ₹40', callback_data: 'buy_25' }],
-                [{ text: '50 Credits – ₹70', callback_data: 'buy_50' }],
-                [{ text: '100 Credits – ₹120', callback_data: 'buy_100' }],
-                [{ text: '⭐ 1 Day Unlimited – ₹150', callback_data: 'buy_unlimited' }],
-            ]
-        };
+        const keyboard = getPaymentButtons();
         bot.sendMessage(chatId, '💳 **Choose a plan:**', { parse_mode: 'Markdown', reply_markup: keyboard });
         return;
     }
 
     // ===== MY CREDITS =====
     if (text === '💰 MY CREDITS') {
-        const isUnlimited = user.daily_unlimited > Date.now() / 1000;
+        const isUnlimited = user.daily_unlimited > Date.now() / 1000 || user.lifetime_unlimited === true;
         const unlimitedText = isUnlimited ? '\n⭐ **Unlimited Plan Active!**' : '';
+        const lifetimeText = user.lifetime_unlimited ? '🔮 **Lifetime Unlimited Active!**' : '';
         bot.sendMessage(chatId, 
-            `💰 **Your Credits:** \`${user.credits}\`${unlimitedText}\n⚔️ **Total Attacks:** ${user.total_attacks || 0}\n\n💡 Each minute costs 1 credit (max 10)\n⭐ 1 Day Unlimited: 100 coins`,
+            `💰 **Your Credits:** \`${user.credits}\`${unlimitedText}\n${lifetimeText}\n⚔️ **Total Attacks:** ${user.total_attacks || 0}\n👥 **Total Referrals:** ${user.total_referrals || 0}\n\n💡 Each minute costs 1 credit (max 10)\n⭐ 1 Day Unlimited: 50 coins\n🔮 Lifetime Unlimited: 400 coins`,
             { parse_mode: 'Markdown' }
         );
         return;
@@ -1089,7 +1193,9 @@ bot.on('message', async (msg) => {
     if (text === '🔗 REFERRAL') {
         if (!await isJoined(chatId, bot)) {
             const channels = await getChannels();
-            return bot.sendMessage(chatId, `🚫 Join required channels first to use referral:\n${channels.join('\n')}`);
+            const privateChannels = await getPrivateChannels();
+            const allChannels = [...channels, ...privateChannels];
+            return bot.sendMessage(chatId, `🚫 Join required channels first to use referral:\n${allChannels.join('\n')}`);
         }
         const code = await generateReferralCode(chatId);
         const botInfo = await bot.getMe();
@@ -1105,9 +1211,9 @@ bot.on('message', async (msg) => {
         const sessions = user.bomb_sessions || [];
         const totalSessions = sessions.length;
         const totalSent = sessions.reduce((sum, s) => sum + (s.total_sent || 0), 0);
-        const isUnlimited = user.daily_unlimited > Date.now() / 1000;
+        const isUnlimited = user.daily_unlimited > Date.now() / 1000 || user.lifetime_unlimited === true;
         bot.sendMessage(chatId, 
-            `📊 **Your Stats**\n👤 ID: ${chatId}\n💰 Credits: ${user.credits}\n⚔️ Attacks: ${user.total_attacks || 0}\n📈 Sessions: ${totalSessions}\n📬 OTPs Sent: ${totalSent}\n⭐ Unlimited: ${isUnlimited ? '✅ Active' : '❌ Inactive'}`,
+            `📊 **Your Stats**\n👤 ID: ${chatId}\n💰 Credits: ${user.credits}\n⚔️ Attacks: ${user.total_attacks || 0}\n📈 Sessions: ${totalSessions}\n📬 OTPs Sent: ${totalSent}\n⭐ Unlimited: ${isUnlimited ? '✅ Active' : '❌ Inactive'}\n👥 Referrals: ${user.total_referrals || 0}`,
             { parse_mode: 'Markdown' }
         );
         return;
@@ -1116,7 +1222,7 @@ bot.on('message', async (msg) => {
     // ===== HELP =====
     if (text === '❓ HELP') {
         bot.sendMessage(chatId, 
-            `🤖 **BOT COMMANDS & HELP**\n\n📱 **START BOMB** - Start bombing (choose duration)\n⏹️ **STOP BOMB** - Stop active bombing\n💰 **MY CREDITS** - Check your credits\n🎁 **DAILY SPIN** - Daily spin wheel (1-5 credits)\n🎟️ **REDEEM CODE** - Redeem code\n🔗 **REFERRAL** - Get referral link\n💳 **BUY CREDITS** - Buy credits\n⚙️ **SETTINGS** - Modify scanner/headers\n📊 **MY STATS** - View your stats\n\n💡 **Bombing Costs:**\n• 1-10 minutes: 1 credit per minute\n• 11-60 minutes: 10 credits\n• ⭐ 1 Day Unlimited: 100 coins\n\n📞 **Voice/WA Calls:** Always active via API5\n\n💳 **Payment:**\n• Select plan > Scan QR > Pay > Send screenshot\n• Admin will approve\n\n⭐ **Referral Bonus:** 5 credits each!`,
+            `🤖 **BOT COMMANDS & HELP**\n\n📱 **START BOMB** - Start bombing (choose duration)\n⏹️ **STOP BOMB** - Stop active bombing\n💰 **MY CREDITS** - Check your credits\n🎁 **DAILY SPIN** - Daily spin wheel (1-5 credits)\n🎟️ **REDEEM CODE** - Redeem code\n🔗 **REFERRAL** - Get referral link\n💳 **BUY CREDITS** - Buy credits\n⚙️ **SETTINGS** - Modify scanner/headers\n📊 **MY STATS** - View your stats\n\n💡 **Bombing Costs:**\n• 1-10 minutes: 1 credit per minute\n• 11-60 minutes: 10 credits\n• ⭐ 1 Day Unlimited: 50 coins\n• 🔮 Lifetime Unlimited: 400 coins\n\n📞 **Voice/WA Calls:** Always active via API5\n\n💳 **Payment:**\n• Select plan > Scan QR > Pay > Send screenshot\n• Admin will approve\n\n⭐ **Referral Bonus:** 5 credits each!`,
             { parse_mode: 'Markdown' }
         );
         return;
@@ -1155,19 +1261,20 @@ bot.on('message', async (msg) => {
             const totalCredits = (await User.aggregate([{ $group: { _id: null, total: { $sum: '$credits' } } }]))[0]?.total || 0;
             const config = await getScannerConfig();
             const channels = await getChannels();
+            const privateChannels = await getPrivateChannels();
             const totalApis = 140;
             bot.sendMessage(chatId, 
-                `📊 **BOT STATS**\n👥 Users: ${totalUsers}\n💰 Total credits: ${totalCredits}\n⚔️ Attacks: ${totalAttacks}\n📡 APIs loaded: ${totalApis}\n📺 Channels: ${channels.length}\n🛡️ Scanners: ${config.scanners.length}\n🌐 Load Balancer: ✅ Active\n🌐 API Instances: 5 (API5: Voice/WA)`,
+                `📊 **BOT STATS**\n👥 Users: ${totalUsers}\n💰 Total credits: ${totalCredits}\n⚔️ Attacks: ${totalAttacks}\n📡 APIs loaded: ${totalApis}\n📺 Channels: ${channels.length}\n🔒 Private Channels: ${privateChannels.length}\n🛡️ Scanners: ${config.scanners.length}\n🌐 Load Balancer: ✅ Active\n🌐 API Instances: 5 (API5: Voice/WA)`,
                 { parse_mode: 'Markdown' }
             );
             return;
         }
 
         if (text === '👥 USERS LIST') {
-            const users = await User.find().select('_id username credits total_attacks').limit(20);
+            const users = await User.find().select('_id username credits total_attacks total_referrals').limit(20);
             let list = '👥 Users (first 20):\n\n';
             users.forEach(u => {
-                list += `🆔 ${u._id} | @${u.username || 'no_username'} | 💰${u.credits} | 💥${u.total_attacks}\n`;
+                list += `🆔 ${u._id} | @${u.username || 'no_username'} | 💰${u.credits} | 💥${u.total_attacks} | 👥${u.total_referrals || 0}\n`;
             });
             bot.sendMessage(chatId, list);
             return;
@@ -1227,7 +1334,7 @@ bot.on('message', async (msg) => {
         }
 
         if (text === '📋 ALL USERS') {
-            const users = await User.find().select('_id username credits');
+            const users = await User.find().select('_id username credits total_referrals');
             let page = 0;
             const perPage = 15;
             const totalPages = Math.ceil(users.length / perPage);
@@ -1237,7 +1344,7 @@ bot.on('message', async (msg) => {
                 const chunk = users.slice(start, end);
                 let msg = '👥 **ALL USERS**\n\n';
                 chunk.forEach(u => {
-                    msg += `🆔 \`${u._id}\` | @${u.username || 'no_username'} | 💰${u.credits}\n`;
+                    msg += `🆔 \`${u._id}\` | @${u.username || 'no_username'} | 💰${u.credits} | 👥${u.total_referrals || 0}\n`;
                 });
                 msg += `\nPage ${pageNum+1}/${totalPages}`;
                 const markup = totalPages > 1 ? {
@@ -1262,7 +1369,8 @@ bot.on('message', async (msg) => {
         if (text === '📺 CHANNEL MANAGER') {
             const keyboard = {
                 inline_keyboard: [
-                    [{ text: '➕ Add Channel', callback_data: 'channel_add' }],
+                    [{ text: '➕ Add Public Channel', callback_data: 'channel_add_public' }],
+                    [{ text: '🔒 Add Private Channel', callback_data: 'channel_add_private' }],
                     [{ text: '➖ Remove Channel', callback_data: 'channel_remove' }],
                     [{ text: '📋 View Channels', callback_data: 'channel_view' }],
                     [{ text: '🔙 Back to Admin', callback_data: 'admin_back' }]
@@ -1294,7 +1402,9 @@ bot.on('message', async (msg) => {
         }
         if (!await isJoined(chatId, bot)) {
             const channels = await getChannels();
-            return bot.sendMessage(chatId, `🚫 Join required channels first:\n${channels.join('\n')}`);
+            const privateChannels = await getPrivateChannels();
+            const allChannels = [...channels, ...privateChannels];
+            return bot.sendMessage(chatId, `🚫 Join required channels first:\n${allChannels.join('\n')}`);
         }
         bot.sendMessage(chatId, '📱 Send the 10-digit phone number to bomb:');
         userStates.set(chatId, { state: 'enter_phone' });
@@ -1333,13 +1443,7 @@ bot.on('message', async (msg) => {
             const phone = input.replace(/\D/g, '');
             if (phone.length !== 10) return bot.sendMessage(chatId, '❌ Invalid number! Must be 10 digits.');
             userStates.set(chatId, { phone: phone });
-            const keyboard = {
-                inline_keyboard: [
-                    [{ text: '🟢 1 Min (1 coin)', callback_data: 'dur_1' }, { text: '🟢 2 Min (2 coins)', callback_data: 'dur_2' }, { text: '🟢 3 Min (3 coins)', callback_data: 'dur_3' }],
-                    [{ text: '🟢 5 Min (5 coins)', callback_data: 'dur_5' }, { text: '🟢 10 Min (10 coins)', callback_data: 'dur_10' }, { text: '🟢 30 Min (10 coins)', callback_data: 'dur_30' }],
-                    [{ text: '🟢 60 Min (10 coins)', callback_data: 'dur_60' }, { text: '⭐ 1 Day (100 coins)', callback_data: 'dur_1440' }]
-                ]
-            };
+            const keyboard = getColorfulButtons();
             bot.sendMessage(chatId, `📱 Target: \`${phone}\`\n⏱️ **Select Bombing Duration:**\n\n📞 Voice/WA will run continuously via API5`, 
                 { parse_mode: 'Markdown', reply_markup: keyboard });
             return;
@@ -1411,7 +1515,7 @@ bot.on('message', async (msg) => {
             const target = await getUser(uid);
             target.daily_unlimited = Date.now() / 1000 + 86400;
             await target.save();
-            bot.sendMessage(chatId, `✅ Unlimited plan granted to user ${uid} for 24 hours!`);
+            bot.sendMessage(chatId, `✅ 1-Day Unlimited plan granted to user ${uid} for 24 hours!`);
             try {
                 await bot.sendMessage(uid, '⭐ **You\'ve been granted a 1-Day Unlimited Bombing Plan!**\n\nYou can now bomb any number for free for the next 24 hours!\nUse START BOMB to start bombing.');
             } catch (e) {}
@@ -1477,9 +1581,14 @@ bot.on('callback_query', async (callbackQuery) => {
 
         const userId = payment.userId;
         const credits = payment.credits;
+        const isLifetime = payment.lifetime || false;
         
         try {
-            if (credits > 0) {
+            if (isLifetime) {
+                const user = await getUser(userId);
+                user.lifetime_unlimited = true;
+                await user.save();
+            } else if (credits > 0) {
                 await updateCredits(userId, credits);
             } else {
                 const user = await getUser(userId);
@@ -1491,12 +1600,10 @@ bot.on('callback_query', async (callbackQuery) => {
             pendingScreenshots.set(payId, payment);
 
             try {
-                await bot.sendMessage(userId,
-                    `🎉 **Payment Approved!**\n\n` +
-                    `✅ Your payment of ₹${payment.price} has been approved.\n` +
-                    `💰 ${credits > 0 ? `Added ${credits} credits!` : '⭐ Unlimited Plan Activated for 24 hours!'}\n\n` +
-                    `Use START BOMB to start bombing!`
-                );
+                const msgText = isLifetime ? 
+                    `🎉 **Payment Approved!**\n\n✅ Your payment of ₹${payment.price} has been approved.\n🔮 **Lifetime Unlimited Plan Activated Forever!**\n\nUse START BOMB to start bombing!` :
+                    `🎉 **Payment Approved!**\n\n✅ Your payment of ₹${payment.price} has been approved.\n💰 ${credits > 0 ? `Added ${credits} credits!` : '⭐ Unlimited Plan Activated for 24 hours!'}\n\nUse START BOMB to start bombing!`;
+                await bot.sendMessage(userId, msgText);
             } catch (e) {}
 
             await bot.editMessageText(
@@ -1504,7 +1611,7 @@ bot.on('callback_query', async (callbackQuery) => {
                 `👤 User: ${payment.first_name}\n` +
                 `💳 Plan: ${payment.plan}\n` +
                 `💰 Amount: ₹${payment.price}\n` +
-                `✅ Status: APPROVED`,
+                `✅ Status: APPROVED${isLifetime ? ' (Lifetime)' : ''}`,
                 { chat_id: chatId, message_id: msgId }
             );
 
@@ -1581,10 +1688,18 @@ bot.on('callback_query', async (callbackQuery) => {
     }
 
     // ===== CHANNEL MANAGER =====
-    if (data === 'channel_add') {
+    if (data === 'channel_add_public') {
         if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
-        userStates.set(chatId, { state: 'add_channel' });
-        bot.editMessageText('📺 Send channel username to add (e.g., @channelname):', { chat_id: chatId, message_id: msgId });
+        userStates.set(chatId, { state: 'add_channel_public' });
+        bot.editMessageText('📺 Send public channel username to add (e.g., @channelname):', { chat_id: chatId, message_id: msgId });
+        bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+
+    if (data === 'channel_add_private') {
+        if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
+        userStates.set(chatId, { state: 'add_channel_private' });
+        bot.editMessageText('🔒 Send private channel username to add (e.g., @privatechannel):', { chat_id: chatId, message_id: msgId });
         bot.answerCallbackQuery(callbackQuery.id);
         return;
     }
@@ -1592,12 +1707,17 @@ bot.on('callback_query', async (callbackQuery) => {
     if (data === 'channel_remove') {
         if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
         const channels = await getChannels();
-        if (channels.length === 0) {
+        const privateChannels = await getPrivateChannels();
+        const allChannels = [...channels, ...privateChannels];
+        if (allChannels.length === 0) {
             bot.editMessageText('📭 No channels to remove.', { chat_id: chatId, message_id: msgId });
             return bot.answerCallbackQuery(callbackQuery.id);
         }
         userStates.set(chatId, { state: 'remove_channel' });
-        let msg = '📺 **Current Channels:**\n' + channels.join('\n') + '\n\nSend channel username to remove:';
+        let msg = '📺 **Current Channels:**\n\n';
+        if (channels.length) msg += '🔓 Public:\n' + channels.join('\n') + '\n\n';
+        if (privateChannels.length) msg += '🔒 Private:\n' + privateChannels.join('\n') + '\n\n';
+        msg += 'Send channel username to remove:';
         bot.editMessageText(msg, { chat_id: chatId, message_id: msgId });
         bot.answerCallbackQuery(callbackQuery.id);
         return;
@@ -1606,7 +1726,11 @@ bot.on('callback_query', async (callbackQuery) => {
     if (data === 'channel_view') {
         if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
         const channels = await getChannels();
-        const msg = channels.length ? `📺 **Required Channels:**\n${channels.join('\n')}` : '📭 No channels configured.';
+        const privateChannels = await getPrivateChannels();
+        let msg = '📺 **Required Channels:**\n\n';
+        if (channels.length) msg += '🔓 Public:\n' + channels.join('\n') + '\n\n';
+        if (privateChannels.length) msg += '🔒 Private:\n' + privateChannels.join('\n') + '\n\n';
+        if (!channels.length && !privateChannels.length) msg = '📭 No channels configured.';
         bot.editMessageText(msg, { chat_id: chatId, message_id: msgId });
         bot.answerCallbackQuery(callbackQuery.id);
         return;
@@ -1671,7 +1795,7 @@ bot.on('callback_query', async (callbackQuery) => {
             const chunk = state.users.slice(start, end);
             let msg = '👥 **ALL USERS**\n\n';
             chunk.forEach(u => {
-                msg += `🆔 \`${u._id}\` | @${u.username || 'no_username'} | 💰${u.credits}\n`;
+                msg += `🆔 \`${u._id}\` | @${u.username || 'no_username'} | 💰${u.credits} | 👥${u.total_referrals || 0}\n`;
             });
             msg += `\nPage ${page+1}/${state.totalPages}`;
             const markup = {
@@ -1685,6 +1809,74 @@ bot.on('callback_query', async (callbackQuery) => {
             userStates.set(chatId, state);
         }
         bot.answerCallbackQuery(callbackQuery.id);
+        return;
+    }
+});
+
+// ============================================================
+// ===== ADDITIONAL STATE HANDLERS FOR CHANNEL MANAGER =====
+// ============================================================
+
+// Channel add handlers (public/private)
+bot.on('message', async (msg) => {
+    const chatId = msg.chat.id;
+    const text = msg.text;
+    const state = userStates.get(chatId);
+    
+    if (!state) return;
+    
+    if (state.state === 'add_channel_public' && text) {
+        if (!ADMIN_IDS.includes(Number(chatId))) {
+            userStates.delete(chatId);
+            return bot.sendMessage(chatId, '❌ Admin only!');
+        }
+        const channel = text.trim();
+        if (!channel.startsWith('@')) {
+            return bot.sendMessage(chatId, '❌ Channel name must start with @');
+        }
+        await addChannel(channel, false);
+        bot.sendMessage(chatId, `✅ Public channel ${channel} added successfully!`);
+        userStates.delete(chatId);
+        return;
+    }
+    
+    if (state.state === 'add_channel_private' && text) {
+        if (!ADMIN_IDS.includes(Number(chatId))) {
+            userStates.delete(chatId);
+            return bot.sendMessage(chatId, '❌ Admin only!');
+        }
+        const channel = text.trim();
+        if (!channel.startsWith('@')) {
+            return bot.sendMessage(chatId, '❌ Channel name must start with @');
+        }
+        await addChannel(channel, true);
+        bot.sendMessage(chatId, `✅ Private channel ${channel} added successfully!`);
+        userStates.delete(chatId);
+        return;
+    }
+    
+    if (state.state === 'remove_channel' && text) {
+        if (!ADMIN_IDS.includes(Number(chatId))) {
+            userStates.delete(chatId);
+            return bot.sendMessage(chatId, '❌ Admin only!');
+        }
+        const channel = text.trim();
+        if (!channel.startsWith('@')) {
+            return bot.sendMessage(chatId, '❌ Channel name must start with @');
+        }
+        // Check both public and private
+        const channels = await getChannels();
+        const privateChannels = await getPrivateChannels();
+        if (channels.includes(channel)) {
+            await removeChannel(channel, false);
+            bot.sendMessage(chatId, `✅ Public channel ${channel} removed successfully!`);
+        } else if (privateChannels.includes(channel)) {
+            await removeChannel(channel, true);
+            bot.sendMessage(chatId, `✅ Private channel ${channel} removed successfully!`);
+        } else {
+            bot.sendMessage(chatId, `❌ Channel ${channel} not found!`);
+        }
+        userStates.delete(chatId);
         return;
     }
 });
@@ -1710,7 +1902,14 @@ app.get('/health', (req, res) => {
         pendingPayments: pendingScreenshots.size,
         loadBalancer: 'Active',
         apiInstances: Object.keys(API_URLS).length,
-        api5Type: 'Voice & WhatsApp Only'
+        api5Type: 'Voice & WhatsApp Only',
+        features: {
+            colorfulButtons: true,
+            lifetimeUnlimited: true,
+            referralSystem: true,
+            privateChannels: true,
+            perSecondStats: true
+        }
     });
 });
 
@@ -1719,16 +1918,14 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`✅ Health check server listening on port ${PORT}`);
 });
 
-console.log('🤖 FAST Bot started successfully!');
+console.log('🤖 ULTIMATE Bot started successfully!');
 console.log(`📡 Load Balancer: FAST MODE ACTIVE`);
 console.log(`🌐 API Instances: 5`);
-console.log(`   API1-4: All APIs (Parallel)`);
-console.log(`   API5: Voice & WhatsApp Only (Always Active)`);
-console.log(`⚡ Speed Optimizations: ACTIVE`);
-console.log(`   - Multiple APIs simultaneously`);
-console.log(`   - Reduced timeouts (3s)`);
-console.log(`   - Faster cycle delays (20ms)`);
-console.log(`🎁 Daily Spin: 1-5 credits`);
+console.log(`🎨 Colorful Buttons: ACTIVE`);
+console.log(`⭐ Plans: 1 Day (₹50) | Lifetime (₹400)`);
+console.log(`📊 Per-Second Stats: ACTIVE (Updates every 5s)`);
+console.log(`👥 Referral System: ACTIVE (Admin notified)`);
+console.log(`🔒 Private Channels: SUPPORTED`);
 console.log(`📸 QR Code payment system: ${qrCodeSet ? '✅' : '❌'}`);
 console.log(`💳 Screenshot approval system: ✅`);
 console.log(`📢 Broadcast system: ✅`);
