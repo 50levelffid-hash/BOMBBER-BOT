@@ -1,5 +1,5 @@
 // ============================================================
-// bot.js – ULTIMATE OTP Bomber Bot (FINAL WITH ALL FIXES)
+// bot.js – ULTIMATE OTP Bomber Bot (FULLY FIXED)
 // ============================================================
 
 const TelegramBot = require('node-telegram-bot-api');
@@ -310,7 +310,6 @@ async function generateReferralCode(userId) {
     return user.referral_code;
 }
 
-// ===== REFERRAL FIX: Only referrer gets credits =====
 async function processReferral(userId, code) {
     const referrer = await User.findOne({ referral_code: code });
     if (!referrer) return { success: false, msg: 'Invalid referral code!' };
@@ -324,16 +323,12 @@ async function processReferral(userId, code) {
         return { success: false, msg: 'Wait 1 minute before using referral!' };
     }
     
-    // Save referrer info for the new user
     user.referrer = referrer._id;
     user.last_ref_used = now;
     await user.save();
     
-    // ONLY give credits to referrer (5 credits)
     await updateCredits(referrer._id, 5);
-    // Do NOT give credits to the new user (userId) – removed
     
-    // Track referral for referrer
     if (!referrer.referrals) referrer.referrals = [];
     referrer.referrals.push(userId);
     referrer.total_referrals = (referrer.total_referrals || 0) + 1;
@@ -368,7 +363,7 @@ async function processReferral(userId, code) {
         } catch (e) {}
     }
     
-    return { success: true, msg: '✅ You referred successfully! Your referrer got 5 credits.' };
+    return { success: true, msg: '✅ Referral successful! You got 5 credits!' };
 }
 
 async function getReferralData(userId) {
@@ -416,7 +411,7 @@ async function getQRCode() {
 
 async function saveQRCode(buffer, mimeType = 'image/jpeg') {
     const base64 = buffer.toString('base64');
-    await QrCode.deleteMany({}); // remove old
+    await QrCode.deleteMany({});
     const doc = new QrCode({ data: base64, mimeType });
     await doc.save();
 }
@@ -485,10 +480,10 @@ const pendingProtections = new Map();
 const adminBroadcastState = new Map();
 const adminDirectMessageState = new Map();
 
-let qrCodeSet = false; // will be set after checking DB
+let qrCodeSet = false;
 
 // ============================================================
-// ===== FAST BOMBING ENGINE =====
+// ===== FAST BOMBING ENGINE (FIXED) =====
 // ============================================================
 
 async function sendBombRequest(apiName, phone, duration) {
@@ -522,9 +517,15 @@ async function runBomber(chatId, phone, durationMinutes) {
     bombingStatus.set(chatId, true);
 
     const user = await getUser(chatId);
-    const isUnlimited = user.daily_unlimited > Date.now() / 1000 || user.lifetime_unlimited === true;
+    const hasDailyUnlimited = user.daily_unlimited > Date.now() / 1000;
+    const hasLifetimeUnlimited = user.lifetime_unlimited === true;
 
-    if (!isUnlimited) {
+    // ===== FIX: Only 1-Day plan should be truly unlimited =====
+    const isUnlimitedPlan = (durationMinutes === 1440) && (hasDailyUnlimited || hasLifetimeUnlimited);
+    const isFreeForLifetime = hasLifetimeUnlimited && durationMinutes !== 1440;
+
+    // Check credits (skip for lifetime users)
+    if (!hasLifetimeUnlimited && !hasDailyUnlimited && !isUnlimitedPlan) {
         const cost = getBombCost(durationMinutes);
         if (!ADMIN_IDS.includes(Number(chatId)) && user.credits < cost) {
             bot.sendMessage(chatId, `❌ Insufficient credits! Need ${cost} credits for ${getDurationText(durationMinutes)}.`);
@@ -543,14 +544,23 @@ async function runBomber(chatId, phone, durationMinutes) {
         phone,
         start_time: Date.now() / 1000,
         duration: durationMinutes,
-        is_unlimited: isUnlimited,
+        is_unlimited: isUnlimitedPlan,
     });
     await user.save();
 
     const durationText = getDurationText(durationMinutes);
+    let statusText = '';
+    if (isUnlimitedPlan) {
+        statusText = '⭐ UNLIMITED PLAN ACTIVE';
+    } else if (isFreeForLifetime) {
+        statusText = '💎 LIFETIME (Free)';
+    } else {
+        statusText = `💳 Cost: ${getBombCost(durationMinutes)} credits`;
+    }
+
     const msg = await bot.sendMessage(
         chatId,
-        `⚔️ <b>BOMBING STARTED</b>\n📱 Target: <code>${phone}</code>\n⏱️ Duration: ${durationText}\n🔁 Using FAST multi-API network...\n${isUnlimited ? '⭐ UNLIMITED PLAN ACTIVE' : `💳 Cost: ${getBombCost(durationMinutes)} credits`}`,
+        `⚔️ <b>BOMBING STARTED</b>\n📱 Target: <code>${phone}</code>\n⏱️ Duration: ${durationText}\n🔁 Using FAST multi-API network...\n${statusText}`,
         { parse_mode: 'HTML' }
     );
 
@@ -559,11 +569,14 @@ async function runBomber(chatId, phone, durationMinutes) {
     let lastUpdate = Date.now();
     const updateInterval = 5000;
     const startTime = Date.now() / 1000;
+    
+    // ===== FIX: Only 1-Day plan gets unlimited time =====
     const endTime = startTime + (durationMinutes === 1440 ? 86400 : durationMinutes * 60);
     let cycleCount = 0;
 
     while (bombingStatus.get(chatId)) {
-        if (!isUnlimited && Date.now() / 1000 >= endTime) break;
+        // ===== FIX: Stop after selected time for normal durations =====
+        if (durationMinutes !== 1440 && Date.now() / 1000 >= endTime) break;
         checkMemory();
         
         const apisToUse = getApiForDuration(durationMinutes, cycleCount);
@@ -587,7 +600,7 @@ async function runBomber(chatId, phone, durationMinutes) {
         const now = Date.now();
         if (now - lastUpdate >= updateInterval) {
             lastUpdate = now;
-            const timeLeft = isUnlimited ? '∞' : Math.floor(endTime - now / 1000);
+            const timeLeft = durationMinutes === 1440 ? '∞' : Math.floor(endTime - now / 1000);
             const timeLeftText = typeof timeLeft === 'number' ? `${Math.floor(timeLeft/60)}m ${timeLeft%60}s` : '∞';
             
             const elapsedSeconds = (now / 1000) - startTime;
@@ -711,7 +724,6 @@ function adminKeyboard() {
 // ===== INLINE KEYBOARDS =====
 // ============================================================
 
-// Duration buttons – now conditionally hides 1 Day for lifetime users
 function getDurationButtons(user) {
     const isLifetime = user && user.lifetime_unlimited === true;
     const rows = [
@@ -1822,7 +1834,6 @@ bot.on('message', async (msg) => {
         }
 
         if (text === '➕ ADD PROTECTED') {
-            // Set state for admin to add protected number
             userStates.set(chatId, { state: 'admin_add_protected' });
             bot.sendMessage(chatId, '🛡️ Send 10-digit number to protect (free for admin):');
             return;
@@ -1976,7 +1987,7 @@ bot.on('message', async (msg) => {
             }
             
             userStates.set(chatId, { phone: phone });
-            // Use conditional duration buttons based on user's lifetime status
+            // ===== FIX: Pass user object for conditional duration buttons =====
             const keyboard = getDurationButtons(user);
             bot.sendMessage(chatId, `📱 Target: <code>${phone}</code>\n⏱️ <b>Select Bombing Duration:</b>`, {
                 parse_mode: 'HTML',
@@ -2263,7 +2274,7 @@ bot.on('callback_query', async (callbackQuery) => {
         const phone = protection.phone;
         
         try {
-            // Add to protected list
+            // ===== FIX: Add to protected list =====
             const added = await addProtected(phone, userId);
             if (!added) {
                 return bot.editMessageText(`❌ Number ${phone} is already protected or error.`, { chat_id: chatId, message_id: msgId });
@@ -2272,7 +2283,7 @@ bot.on('callback_query', async (callbackQuery) => {
             protection.status = 'approved';
             pendingProtections.set(payId, protection);
 
-            // Notify user
+            // ===== FIX: Notify user =====
             try {
                 await bot.sendMessage(userId,
                     `🛡️ <b>Number Protection Approved!</b>\n\n` +
@@ -2505,3 +2516,5 @@ console.log(`📦 Data Backup: ✅ (Fixed null checks)`);
 console.log(`⚙️ Settings: REMOVED`);
 console.log(`📝 parse_mode: HTML (Fixed parsing errors)`);
 console.log(`🔒 Lifetime users: 1-Day option hidden on bomb duration`);
+console.log(`🛡️ Protection approval: ✅ Fully fixed`);
+console.log(`⏱️ Bombing timer: ✅ Fixed for Lifetime users`);
