@@ -310,6 +310,7 @@ async function generateReferralCode(userId) {
     return user.referral_code;
 }
 
+// ===== REFERRAL FIX: Only referrer gets credits =====
 async function processReferral(userId, code) {
     const referrer = await User.findOne({ referral_code: code });
     if (!referrer) return { success: false, msg: 'Invalid referral code!' };
@@ -323,13 +324,16 @@ async function processReferral(userId, code) {
         return { success: false, msg: 'Wait 1 minute before using referral!' };
     }
     
+    // Save referrer info for the new user
     user.referrer = referrer._id;
     user.last_ref_used = now;
     await user.save();
     
-    await updateCredits(userId, 5);
+    // ONLY give credits to referrer (5 credits)
     await updateCredits(referrer._id, 5);
+    // Do NOT give credits to the new user (userId) – removed
     
+    // Track referral for referrer
     if (!referrer.referrals) referrer.referrals = [];
     referrer.referrals.push(userId);
     referrer.total_referrals = (referrer.total_referrals || 0) + 1;
@@ -364,7 +368,7 @@ async function processReferral(userId, code) {
         } catch (e) {}
     }
     
-    return { success: true, msg: '✅ You got 5 credits! Your referrer also got 5 credits!' };
+    return { success: true, msg: '✅ You referred successfully! Your referrer got 5 credits.' };
 }
 
 async function getReferralData(userId) {
@@ -707,27 +711,29 @@ function adminKeyboard() {
 // ===== INLINE KEYBOARDS =====
 // ============================================================
 
-function getDurationButtons() {
-    return {
-        reply_markup: {
-            inline_keyboard: [
-                [
-                    { text: '🟢 1 Min', callback_data: 'dur_1' },
-                    { text: '🔵 2 Min', callback_data: 'dur_2' },
-                    { text: '🔵 3 Min', callback_data: 'dur_3' }
-                ],
-                [
-                    { text: '🔵 5 Min', callback_data: 'dur_5' },
-                    { text: '🔴 10 Min', callback_data: 'dur_10' },
-                    { text: '🔵 30 Min', callback_data: 'dur_30' }
-                ],
-                [
-                    { text: '🟢 60 Min', callback_data: 'dur_60' },
-                    { text: '⭐ 1 Day (100 coins)', callback_data: 'dur_1440' }
-                ]
-            ]
-        }
-    };
+// Duration buttons – now conditionally hides 1 Day for lifetime users
+function getDurationButtons(user) {
+    const isLifetime = user && user.lifetime_unlimited === true;
+    const rows = [
+        [
+            { text: '🟢 1 Min', callback_data: 'dur_1' },
+            { text: '🔵 2 Min', callback_data: 'dur_2' },
+            { text: '🔵 3 Min', callback_data: 'dur_3' }
+        ],
+        [
+            { text: '🔵 5 Min', callback_data: 'dur_5' },
+            { text: '🔴 10 Min', callback_data: 'dur_10' },
+            { text: '🔵 30 Min', callback_data: 'dur_30' }
+        ],
+        [
+            { text: '🟢 60 Min', callback_data: 'dur_60' }
+        ]
+    ];
+    // Only add 1 Day option for non-lifetime users
+    if (!isLifetime) {
+        rows[2].push({ text: '⭐ 1 Day (100 coins)', callback_data: 'dur_1440' });
+    }
+    return { reply_markup: { inline_keyboard: rows } };
 }
 
 function getPaymentButtons() {
@@ -1718,7 +1724,7 @@ bot.on('message', async (msg) => {
         const botInfo = await bot.getMe();
         const refData = await getReferralData(chatId);
         const count = refData.count || 0;
-        const msgText = `🔗 <b>Your Referral Code</b>\n\n🎯 <code>${code}</code>\n\n📊 You have referred: ${count} users\n💰 You earned: ${count * 5} credits\n\n<b>How it works:</b>\n• Share your code with friends\n• When they join, both get 5 credits!\n• <b>Note:</b> Only 1 referral per minute (anti-spam)\n• Invite link: <code>https://t.me/${botInfo.username}?start=${code}</code>`;
+        const msgText = `🔗 <b>Your Referral Code</b>\n\n🎯 <code>${code}</code>\n\n📊 You have referred: ${count} users\n💰 You earned: ${count * 5} credits\n\n<b>How it works:</b>\n• Share your code with friends\n• When they join, only you get 5 credits!\n• <b>Note:</b> Only 1 referral per minute (anti-spam)\n• Invite link: <code>https://t.me/${botInfo.username}?start=${code}</code>`;
         bot.sendMessage(chatId, msgText, { parse_mode: 'HTML' });
         return;
     }
@@ -1739,7 +1745,7 @@ bot.on('message', async (msg) => {
     // ===== HELP =====
     if (text === '❓ HELP') {
         bot.sendMessage(chatId, 
-            `🤖 <b>BOT COMMANDS & HELP</b>\n\n📱 <b>START BOMB</b> - Start bombing (choose duration)\n⏹️ <b>STOP BOMB</b> - Stop active bombing\n💰 <b>MY CREDITS</b> - Check your credits\n🎁 <b>DAILY SPIN</b> - Daily spin wheel (1-5 credits)\n🎟️ <b>REDEEM CODE</b> - Redeem code\n🔗 <b>REFERRAL</b> - Get referral link\n💳 <b>BUY CREDITS</b> - Buy credits\n🛡️ <b>PROTECT NUMBER</b> - Protect a number (₹${PROTECTION_PRICE})\n📊 <b>MY STATS</b> - View your stats\n\n💡 <b>Bombing Costs:</b>\n• 1-10 minutes: 1 credit per minute\n• 11-60 minutes: 10 credits\n• ⭐ 1 Day Unlimited: 50 coins\n• 🔮 Lifetime Unlimited: 400 coins\n\n🛡️ <b>Number Protection:</b> ₹${PROTECTION_PRICE} per number\n\n📞 <b>Voice/WA Calls:</b> Always active via API5\n\n💳 <b>Payment:</b>\n• Select plan > Scan QR > Pay > Send screenshot\n• Admin will approve\n\n⭐ <b>Referral Bonus:</b> 5 credits each!`,
+            `🤖 <b>BOT COMMANDS & HELP</b>\n\n📱 <b>START BOMB</b> - Start bombing (choose duration)\n⏹️ <b>STOP BOMB</b> - Stop active bombing\n💰 <b>MY CREDITS</b> - Check your credits\n🎁 <b>DAILY SPIN</b> - Daily spin wheel (1-5 credits)\n🎟️ <b>REDEEM CODE</b> - Redeem code\n🔗 <b>REFERRAL</b> - Get referral link\n💳 <b>BUY CREDITS</b> - Buy credits\n🛡️ <b>PROTECT NUMBER</b> - Protect a number (₹${PROTECTION_PRICE})\n📊 <b>MY STATS</b> - View your stats\n\n💡 <b>Bombing Costs:</b>\n• 1-10 minutes: 1 credit per minute\n• 11-60 minutes: 10 credits\n• ⭐ 1 Day Unlimited: 50 coins\n• 🔮 Lifetime Unlimited: 400 coins\n\n🛡️ <b>Number Protection:</b> ₹${PROTECTION_PRICE} per number\n\n📞 <b>Voice/WA Calls:</b> Always active via API5\n\n💳 <b>Payment:</b>\n• Select plan > Scan QR > Pay > Send screenshot\n• Admin will approve\n\n⭐ <b>Referral Bonus:</b> Only referrer gets 5 credits!`,
             { parse_mode: 'HTML' }
         );
         return;
@@ -1970,7 +1976,8 @@ bot.on('message', async (msg) => {
             }
             
             userStates.set(chatId, { phone: phone });
-            const keyboard = getDurationButtons();
+            // Use conditional duration buttons based on user's lifetime status
+            const keyboard = getDurationButtons(user);
             bot.sendMessage(chatId, `📱 Target: <code>${phone}</code>\n⏱️ <b>Select Bombing Duration:</b>`, {
                 parse_mode: 'HTML',
                 reply_markup: keyboard.reply_markup
@@ -2488,7 +2495,7 @@ console.log(`⭐ Plans: 1 Day (₹50) | Lifetime (₹400)`);
 console.log(`🛡️ Number Protection: ₹${PROTECTION_PRICE} (Payment via QR)`);
 console.log(`🔗 Private Links: SUPPORTED`);
 console.log(`📊 Per-Second Stats: ACTIVE (Updates every 5s)`);
-console.log(`👥 Referral System: ACTIVE (Admin notified)`);
+console.log(`👥 Referral System: ACTIVE (Only referrer gets credits)`);
 console.log(`📸 QR Code stored in MongoDB: ${qrCodeSet ? '✅' : '❌'}`);
 console.log(`💳 Screenshot approval system: ✅`);
 console.log(`📢 Broadcast system: ✅ (No prefix)`);
@@ -2497,3 +2504,4 @@ console.log(`💬 Direct Message: ✅ (forwardMessage)`);
 console.log(`📦 Data Backup: ✅ (Fixed null checks)`);
 console.log(`⚙️ Settings: REMOVED`);
 console.log(`📝 parse_mode: HTML (Fixed parsing errors)`);
+console.log(`🔒 Lifetime users: 1-Day option hidden on bomb duration`);
