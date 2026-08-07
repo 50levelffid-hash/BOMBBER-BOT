@@ -1,6 +1,5 @@
-
 // ============================================================
-// bot.js – ULTIMATE OTP Bomber Bot (API6 + FIXED PROTECTION)
+// bot.js – ULTIMATE OTP Bomber Bot (FULLY FIXED)
 // ============================================================
 
 const TelegramBot = require('node-telegram-bot-api');
@@ -23,13 +22,13 @@ const API_URLS = {
     api3: 'https://api-server-mey8.onrender.com',
     api4: 'https://api-server-0abv.onrender.com',
     api5: 'https://wasataap-call-api.onrender.com',
-    api6: 'https://vishal.lovestoblog.com'   // EXTERNAL API
+    api6: 'https://vishal.lovestoblog.com'
 };
 
 const MONGODB_URL = "mongodb+srv://sahajada07:Sahajada123@cluster0.vynn0ht.mongodb.net/?appName=Cluster0";
 const DB_NAME = "otp_bomber";
 
-const PROTECTION_PRICE = 5; // ₹5
+const PROTECTION_PRICE = 5;
 
 // ============================================================
 // ===== MONGODB CONNECTION =====
@@ -69,11 +68,10 @@ const userSchema = new mongoose.Schema({
 
 const User = mongoose.model('User', userSchema);
 
-// ===== PROTECTION SCHEMA (FIXED) =====
+// ===== PROTECTION SCHEMA =====
 const protectedSchema = new mongoose.Schema({
     numbers: { type: Array, default: [] },
     owners: { type: Object, default: {} },
-    payment_ids: { type: Object, default: {} },
     protected_at: { type: Object, default: {} }
 });
 const Protected = mongoose.model('Protected', protectedSchema);
@@ -138,11 +136,11 @@ async function isBanned(id) {
     return user.banned || false;
 }
 
-// ===== PROTECTION FUNCTIONS (FIXED) =====
+// ===== PROTECTION FUNCTIONS =====
 async function getProtected() {
     let doc = await Protected.findOne();
     if (!doc) {
-        doc = new Protected({ numbers: [], owners: {}, payment_ids: {}, protected_at: {} });
+        doc = new Protected({ numbers: [], owners: {}, protected_at: {} });
         await doc.save();
     }
     return doc.numbers;
@@ -151,26 +149,24 @@ async function getProtected() {
 async function getProtectedWithOwners() {
     let doc = await Protected.findOne();
     if (!doc) {
-        doc = new Protected({ numbers: [], owners: {}, payment_ids: {}, protected_at: {} });
+        doc = new Protected({ numbers: [], owners: {}, protected_at: {} });
         await doc.save();
     }
     return { 
         numbers: doc.numbers, 
         owners: doc.owners,
-        payment_ids: doc.payment_ids || {},
         protected_at: doc.protected_at || {}
     };
 }
 
-async function addProtected(number, ownerId, paymentId = null) {
+async function addProtected(number, ownerId) {
     let doc = await Protected.findOne();
     if (!doc) {
-        doc = new Protected({ numbers: [], owners: {}, payment_ids: {}, protected_at: {} });
+        doc = new Protected({ numbers: [], owners: {}, protected_at: {} });
     }
     if (!doc.numbers.includes(number)) {
         doc.numbers.push(number);
         doc.owners[number] = ownerId;
-        if (paymentId) doc.payment_ids[number] = paymentId;
         doc.protected_at[number] = new Date().toISOString();
         await doc.save();
         return true;
@@ -183,8 +179,7 @@ async function removeProtected(number) {
     if (doc) {
         doc.numbers = doc.numbers.filter(n => n !== number);
         delete doc.owners[number];
-        if (doc.payment_ids) delete doc.payment_ids[number];
-        if (doc.protected_at) delete doc.protected_at[number];
+        delete doc.protected_at[number];
         await doc.save();
         return true;
     }
@@ -197,65 +192,9 @@ async function isNumberProtected(number) {
     return doc.numbers.includes(number);
 }
 
-async function getProtectedCount() {
-    const doc = await Protected.findOne();
-    if (!doc) return 0;
-    return doc.numbers.length;
-}
-
-// ===== PROTECTION WITH PAYMENT (FIXED) =====
-async function protectNumberWithPayment(chatId, phone) {
-    const isProtected = await isNumberProtected(phone);
-    if (isProtected) {
-        return { success: false, msg: `⚠️ Number ${phone} is already protected!` };
-    }
-    
-    const payId = Math.random().toString(36).substring(2, 10).toUpperCase();
-    
-    // Store pending protection request
-    pendingProtections.set(payId, {
-        userId: chatId,
-        phone: phone,
-        status: 'pending_payment',
-        timestamp: Date.now(),
-        username: null,
-        first_name: null
-    });
-    
-    return { 
-        success: true, 
-        msg: `🛡️ <b>Number Protection Request</b>\n\n` +
-             `📱 Number: <code>${phone}</code>\n` +
-             `💰 Price: ₹${PROTECTION_PRICE}\n\n` +
-             `📌 <b>Instructions:</b>\n` +
-             `1️⃣ Scan the QR code below\n` +
-             `2️⃣ Pay ₹${PROTECTION_PRICE} via UPI\n` +
-             `3️⃣ Take a screenshot of payment\n` +
-             `4️⃣ Send screenshot here\n\n` +
-             `📸 <b>After payment, send screenshot!</b>`,
-        payId: payId
-    };
-}
-
 // ============================================================
-// ===== OTHER DATABASE FUNCTIONS =====
+// ===== CHANNEL FUNCTIONS =====
 // ============================================================
-
-async function createRedeemCode(code, amount) {
-    const redeem = new Redeem({ code, amount });
-    await redeem.save();
-    return code;
-}
-
-async function getRedeemCode(code) {
-    const doc = await Redeem.findOne({ code, used: false });
-    if (doc) {
-        doc.used = true;
-        await doc.save();
-        return doc.amount;
-    }
-    return null;
-}
 
 async function getChannels() {
     let doc = await Channel.findOne();
@@ -335,6 +274,26 @@ async function removeChannel(channel, isPrivate = false) {
         }
         await doc.save();
     }
+}
+
+// ============================================================
+// ===== OTHER DATABASE FUNCTIONS =====
+// ============================================================
+
+async function createRedeemCode(code, amount) {
+    const redeem = new Redeem({ code, amount });
+    await redeem.save();
+    return code;
+}
+
+async function getRedeemCode(code) {
+    const doc = await Redeem.findOne({ code, used: false });
+    if (doc) {
+        doc.used = true;
+        await doc.save();
+        return doc.amount;
+    }
+    return null;
 }
 
 async function generateReferralCode(userId) {
@@ -436,7 +395,7 @@ async function checkChannelJoin(chatId, bot) {
 }
 
 // ============================================================
-// ===== QR CODE FUNCTIONS (MongoDB) =====
+// ===== QR CODE FUNCTIONS =====
 // ============================================================
 
 async function getQRCode() {
@@ -481,14 +440,13 @@ process.on('unhandledRejection', (reason) => {
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
 // ============================================================
-// ===== FAST LOAD BALANCER (WITH API6 - UPTO 10 MIN) =====
+// ===== FAST LOAD BALANCER =====
 // ============================================================
 
 let apiCycleCounter = 0;
 const API_NAMES = ['api1', 'api2', 'api3', 'api4', 'api5', 'api6'];
 
 function getApiForDuration(duration, cycleCount) {
-    // API6 ONLY WORKS UP TO 10 MINUTES
     if (duration <= 1) {
         return ['api1', 'api2', 'api3', 'api4', 'api5', 'api6'];
     }
@@ -513,7 +471,6 @@ const bombingStatus = new Map();
 const userStates = new Map();
 const pendingPayments = new Map();
 const pendingScreenshots = new Map();
-const pendingProtections = new Map();
 const adminBroadcastState = new Map();
 const adminDirectMessageState = new Map();
 
@@ -528,26 +485,13 @@ async function sendBombRequest(apiName, phone, duration) {
     if (!url) return null;
     
     try {
-        // ===== API6: External API (GET request - NO TIMEOUT) =====
         if (apiName === 'api6') {
             const response = await axios.get(`${url}/bomber4.php`, {
-                params: {
-                    phone: phone,
-                    duration: duration
-                }
-                // No timeout for faster response
+                params: { phone: phone, duration: duration }
             });
-            return { 
-                success: true, 
-                totalSent: 1, 
-                sms: 1, 
-                calls: 0, 
-                whatsapp: 0,
-                instance: 'api6-external'
-            };
+            return { success: true, totalSent: 1, sms: 1, calls: 0, whatsapp: 0 };
         }
         
-        // ===== API1-API5: Internal APIs =====
         const response = await axios.post(`${url}/bomb`, {
             phone,
             duration,
@@ -562,7 +506,7 @@ async function sendBombRequest(apiName, phone, duration) {
 async function runBomber(chatId, phone, durationMinutes) {
     const isProtected = await isNumberProtected(phone);
     if (isProtected) {
-        bot.sendMessage(chatId, '⚠️ This number is PROTECTED by admin or user.\nBombing not allowed!');
+        bot.sendMessage(chatId, '⚠️ This number is PROTECTED!\nBombing not allowed!');
         bombingStatus.set(chatId, false);
         return;
     }
@@ -738,15 +682,14 @@ function mainKeyboard() {
                     { text: '🎁 DAILY SPIN', style: 'primary' }
                 ],
                 [
-                    { text: '🛡️ PROTECT NUMBER', style: 'primary' },
-                    { text: '👑 ADMIN PANEL', style: 'danger' }
+                    { text: '👑 ADMIN PANEL', style: 'danger' },
+                    { text: '📊 MY STATS', style: 'primary' }
                 ],
                 [
-                    { text: '📊 MY STATS', style: 'primary' },
-                    { text: '❓ HELP', style: 'primary' }
+                    { text: '❓ HELP', style: 'primary' },
+                    { text: '💳 BUY CREDITS', style: 'success' }
                 ],
                 [
-                    { text: '💳 BUY CREDITS', style: 'success' },
                     { text: '🔗 REFERRAL', style: 'primary' }
                 ]
             ],
@@ -763,8 +706,8 @@ function adminKeyboard() {
                 ['📊 STATS', '👥 USERS LIST'],
                 ['🎟️ GEN CODE', '🚫 BAN USER'],
                 ['✅ UNBAN USER', '💰 ADD CREDITS'],
-                ['➕ ADD PROTECTED', '➖ REMOVE PROTECTED'],
-                ['📋 PROTECTED LIST', '📢 BROADCAST'],
+                ['🛡️ PROTECT NUMBER', '📋 PROTECTED LIST'],
+                ['➖ REMOVE PROTECTED', '📢 BROADCAST'],
                 ['📋 ALL USERS', '🔄 UNLIMITED PLAN'],
                 ['📺 CHANNEL MANAGER', '📸 SET QR CODE'],
                 ['💳 PAYMENT APPROVAL', '💬 MESSAGE USER'],
@@ -813,9 +756,6 @@ function getPaymentButtons() {
                 [
                     { text: '🟢 1 Day Unlimited – ₹50', callback_data: 'buy_unlimited' },
                     { text: '⭐ Lifetime Unlimited – ₹400', callback_data: 'buy_lifetime' }
-                ],
-                [
-                    { text: '🛡️ Protect Number – ₹5', callback_data: 'buy_protect' }
                 ]
             ]
         }
@@ -829,19 +769,6 @@ function getApprovalButtons(payId) {
                 [
                     { text: '✅ Approve', callback_data: `approve_pay_${payId}` },
                     { text: '❌ Reject', callback_data: `reject_pay_${payId}` }
-                ]
-            ]
-        }
-    };
-}
-
-function getProtectionApprovalButtons(payId) {
-    return {
-        reply_markup: {
-            inline_keyboard: [
-                [
-                    { text: '✅ Approve Protection', callback_data: `approve_protect_${payId}` },
-                    { text: '❌ Reject Protection', callback_data: `reject_protect_${payId}` }
                 ]
             ]
         }
@@ -905,25 +832,12 @@ const PAYMENT_PLANS = {
     '10': { credits: 10, price: 20, label: '10 Credits – ₹20' },
     '25': { credits: 25, price: 40, label: '25 Credits – ₹40' },
     'unlimited': { credits: 0, price: 50, label: '⭐ 1 Day Unlimited – ₹50' },
-    'lifetime': { credits: 0, price: 400, label: '⭐ Lifetime Unlimited – ₹400', lifetime: true },
-    'protect': { credits: 0, price: 5, label: '🛡️ Protect Number – ₹5', protect: true }
+    'lifetime': { credits: 0, price: 400, label: '⭐ Lifetime Unlimited – ₹400', lifetime: true }
 };
 
 async function handleBuyCredits(chatId, planKey) {
     const plan = PAYMENT_PLANS[planKey];
     if (!plan) return bot.sendMessage(chatId, '❌ Invalid plan!');
-
-    if (plan.protect) {
-        userStates.set(chatId, { state: 'protect_number' });
-        return bot.sendMessage(chatId, 
-            `🛡️ <b>Number Protection</b>\n\n` +
-            `💰 Price: ₹${PROTECTION_PRICE} per number\n` +
-            `📌 Send the 10-digit number you want to protect:\n\n` +
-            `⚠️ Protected numbers cannot be bombed by anyone!\n\n` +
-            `Type /cancel to cancel.`,
-            { parse_mode: 'HTML' }
-        );
-    }
 
     const qr = await getQRCode();
     if (!qr) {
@@ -977,7 +891,6 @@ async function handlePaymentScreenshot(chatId, msg) {
         credits: plan.credits,
         price: plan.price,
         lifetime: plan.lifetime || false,
-        protect: plan.protect || false,
         photoUrl: url,
         fileId: photo.file_id,
         timestamp: Date.now(),
@@ -1019,66 +932,6 @@ async function handlePaymentScreenshot(chatId, msg) {
 }
 
 // ============================================================
-// ===== PROTECTION SYSTEM (COMPLETELY FIXED) =====
-// ============================================================
-
-async function handleProtectionScreenshot(chatId, msg, payId) {
-    if (!msg.photo) {
-        return bot.sendMessage(chatId, '📸 Please send a <b>screenshot</b> of your payment.', { parse_mode: 'HTML' });
-    }
-
-    const protection = pendingProtections.get(payId);
-    if (!protection) {
-        return bot.sendMessage(chatId, '❌ Protection request expired. Please start again.');
-    }
-
-    const photo = msg.photo[msg.photo.length - 1];
-    const file = await bot.getFile(photo.file_id);
-    const url = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
-
-    // Update protection with photo info
-    protection.photoUrl = url;
-    protection.fileId = photo.file_id;
-    protection.username = msg.from.username || 'No username';
-    protection.first_name = msg.from.first_name || 'No name';
-    protection.status = 'pending_approval';
-    pendingProtections.set(payId, protection);
-
-    const adminMsg = `🛡️ <b>New Number Protection Request!</b>\n\n` +
-        `👤 User: ${protection.first_name} (@${protection.username})\n` +
-        `🆔 User ID: <code>${chatId}</code>\n` +
-        `📱 Number: <code>${protection.phone}</code>\n` +
-        `💰 Amount: ₹${PROTECTION_PRICE}\n` +
-        `🆔 Pay ID: <code>${payId}</code>\n\n` +
-        `Approve or Reject:`;
-
-    const approvalKeyboard = getProtectionApprovalButtons(payId);
-
-    for (const adminId of ADMIN_IDS) {
-        try {
-            await bot.sendPhoto(adminId, photo.file_id, {
-                caption: adminMsg,
-                parse_mode: 'HTML',
-                reply_markup: approvalKeyboard.reply_markup
-            });
-        } catch (e) {
-            console.error(`Failed to send to admin ${adminId}:`, e.message);
-        }
-    }
-
-    await bot.sendMessage(chatId, 
-        `✅ <b>Payment screenshot received!</b>\n\n` +
-        `⏳ Waiting for admin approval...\n` +
-        `📱 Number: ${protection.phone}\n` +
-        `💰 Amount: ₹${PROTECTION_PRICE}\n\n` +
-        `You will be notified once approved.`,
-        { parse_mode: 'HTML' }
-    );
-
-    userStates.delete(chatId);
-}
-
-// ============================================================
 // ===== QR CODE SET HANDLER =====
 // ============================================================
 
@@ -1102,7 +955,7 @@ async function handleSetQRCode(chatId, msg) {
         await saveQRCode(buffer, 'image/jpeg');
         qrCodeSet = true;
         
-        bot.sendMessage(chatId, '✅ <b>QR Code saved successfully to database!</b>\n\nUsers will now see this QR code when buying credits.\nThis QR code will persist across restarts.', { parse_mode: 'HTML' });
+        bot.sendMessage(chatId, '✅ <b>QR Code saved successfully to database!</b>\n\nUsers will now see this QR code when buying credits.', { parse_mode: 'HTML' });
         
         userStates.delete(chatId);
         
@@ -1130,7 +983,7 @@ async function handleDataBackup(chatId) {
         const backup = {
             timestamp: new Date().toISOString(),
             users: users || [],
-            protected: protectedData || { numbers: [], owners: {}, payment_ids: {}, protected_at: {} },
+            protected: protectedData || { numbers: [], owners: {}, protected_at: {} },
             redeemCodes: redeemCodes || [],
             channels: channels || { channels: [], private_channels: [], private_links: [] },
             qrCode: qrCode ? { exists: true, size: qrCode.data.length } : null
@@ -1551,47 +1404,50 @@ bot.on('message', async (msg) => {
         return;
     }
 
-    // ===== PROTECTION SCREENSHOT =====
-    if (state && state.state === 'protection_screenshot' && msg.photo) {
-        const payId = state.payId;
-        await handleProtectionScreenshot(chatId, msg, payId);
+    // ===== ADMIN: SET QR CODE =====
+    if (text === '📸 SET QR CODE') {
+        if (!ADMIN_IDS.includes(Number(chatId))) {
+            return bot.sendMessage(chatId, '❌ Admin only!');
+        }
+        bot.sendMessage(chatId, '📸 <b>Send QR Code Photo</b>\n\nSend a photo to set as payment QR code.', { parse_mode: 'HTML' });
+        userStates.set(chatId, { state: 'set_qr' });
         return;
     }
 
-    // ===== PROTECT NUMBER HANDLER =====
-    if (state && state.state === 'protect_number') {
-        if (text === '/cancel') {
-            userStates.delete(chatId);
-            return bot.sendMessage(chatId, '❌ Protection cancelled.');
+    if (state && state.state === 'set_qr' && msg.photo) {
+        await handleSetQRCode(chatId, msg);
+        return;
+    }
+
+    // ===== ADMIN: PAYMENT APPROVAL =====
+    if (text === '💳 PAYMENT APPROVAL') {
+        if (!ADMIN_IDS.includes(Number(chatId))) {
+            return bot.sendMessage(chatId, '❌ Admin only!');
         }
-        const phone = text.replace(/\D/g, '');
-        if (phone.length !== 10) {
-            return bot.sendMessage(chatId, '❌ Invalid number! Must be 10 digits.\n\nSend again or type /cancel to cancel.');
-        }
+
+        const pending = Array.from(pendingScreenshots.values()).filter(p => p.status === 'pending');
         
-        const result = await protectNumberWithPayment(chatId, phone);
-        if (!result.success) {
-            return bot.sendMessage(chatId, result.msg, { parse_mode: 'HTML' });
+        if (pending.length === 0) {
+            return bot.sendMessage(chatId, '📭 No pending payments.');
         }
-        
-        const qr = await getQRCode();
-        if (!qr) {
-            return bot.sendMessage(chatId, '❌ Payment QR code not configured yet. Please contact admin.');
+
+        let msgText = `💳 <b>Pending Payments</b> (${pending.length})\n\n`;
+        for (const p of pending) {
+            msgText += `👤 ${p.first_name} (@${p.username})\n`;
+            msgText += `💳 ${p.plan} - ₹${p.price}\n`;
+            msgText += `🆔 <code>${p.payId}</code>\n\n`;
         }
-        
-        try {
-            await bot.sendPhoto(chatId, qr.data, { 
-                caption: result.msg,
-                parse_mode: 'HTML'
-            });
-            
-            userStates.set(chatId, { 
-                state: 'protection_screenshot', 
-                payId: result.payId 
-            });
-        } catch (error) {
-            bot.sendMessage(chatId, `❌ Failed to send QR code. Please try again.`);
-        }
+        bot.sendMessage(chatId, msgText, { parse_mode: 'HTML' });
+        return;
+    }
+
+    // ===== BUY CREDITS =====
+    if (text === '💳 BUY CREDITS') {
+        const keyboard = getPaymentButtons();
+        bot.sendMessage(chatId, '💳 <b>Choose a plan:</b>', { 
+            parse_mode: 'HTML', 
+            reply_markup: keyboard.reply_markup 
+        });
         return;
     }
 
@@ -1672,44 +1528,89 @@ bot.on('message', async (msg) => {
         return;
     }
 
-    // ===== ADMIN: SET QR CODE =====
-    if (text === '📸 SET QR CODE') {
+    // ===== ADMIN: PROTECT NUMBER =====
+    if (text === '🛡️ PROTECT NUMBER') {
         if (!ADMIN_IDS.includes(Number(chatId))) {
             return bot.sendMessage(chatId, '❌ Admin only!');
         }
-        bot.sendMessage(chatId, '📸 <b>Send QR Code Photo</b>\n\nSend a photo to set as payment QR code. This will be stored in database and persist across restarts.', { parse_mode: 'HTML' });
-        userStates.set(chatId, { state: 'set_qr' });
+        userStates.set(chatId, { state: 'admin_protect_number' });
+        bot.sendMessage(chatId, '🛡️ Send 10-digit number to protect:');
         return;
     }
 
-    if (state && state.state === 'set_qr' && msg.photo) {
-        await handleSetQRCode(chatId, msg);
+    if (state && state.state === 'admin_protect_number' && text) {
+        if (!ADMIN_IDS.includes(Number(chatId))) {
+            userStates.delete(chatId);
+            return bot.sendMessage(chatId, '❌ Admin only!');
+        }
+        const phone = text.replace(/\D/g, '');
+        if (phone.length !== 10) {
+            return bot.sendMessage(chatId, '❌ Invalid number! Must be 10 digits.');
+        }
+        const isProtected = await isNumberProtected(phone);
+        if (isProtected) {
+            return bot.sendMessage(chatId, `⚠️ Number ${phone} is already protected!`);
+        }
+        const added = await addProtected(phone, `Admin (${chatId})`);
+        if (added) {
+            bot.sendMessage(chatId, `✅ Number ${phone} is now PROTECTED!`);
+        } else {
+            bot.sendMessage(chatId, `❌ Failed to protect ${phone}.`);
+        }
+        userStates.delete(chatId);
         return;
     }
 
-    // ===== ADMIN: PAYMENT APPROVAL =====
-    if (text === '💳 PAYMENT APPROVAL') {
+    // ===== ADMIN: REMOVE PROTECTED =====
+    if (text === '➖ REMOVE PROTECTED') {
         if (!ADMIN_IDS.includes(Number(chatId))) {
             return bot.sendMessage(chatId, '❌ Admin only!');
         }
-
-        const pending = Array.from(pendingScreenshots.values()).filter(p => p.status === 'pending');
-        
-        if (pending.length === 0) {
-            return bot.sendMessage(chatId, '📭 No pending payments.');
-        }
-
-        let msgText = `💳 <b>Pending Payments</b> (${pending.length})\n\n`;
-        for (const p of pending) {
-            msgText += `👤 ${p.first_name} (@${p.username})\n`;
-            msgText += `💳 ${p.plan} - ₹${p.price}\n`;
-            msgText += `🆔 <code>${p.payId}</code>\n\n`;
-        }
-        bot.sendMessage(chatId, msgText, { parse_mode: 'HTML' });
+        userStates.set(chatId, { state: 'admin_remove_protected' });
+        bot.sendMessage(chatId, '❌ Send 10-digit number to unprotect:');
         return;
     }
 
-    // ===== BUY CREDITS =====
+    if (state && state.state === 'admin_remove_protected' && text) {
+        if (!ADMIN_IDS.includes(Number(chatId))) {
+            userStates.delete(chatId);
+            return bot.sendMessage(chatId, '❌ Admin only!');
+        }
+        const phone = text.replace(/\D/g, '');
+        if (phone.length !== 10) {
+            return bot.sendMessage(chatId, '❌ Invalid number! Must be 10 digits.');
+        }
+        const removed = await removeProtected(phone);
+        if (removed) {
+            bot.sendMessage(chatId, `✅ Number ${phone} removed from protected list.`);
+        } else {
+            bot.sendMessage(chatId, `⚠️ Number ${phone} was not in protected list.`);
+        }
+        userStates.delete(chatId);
+        return;
+    }
+
+    // ===== ADMIN: PROTECTED LIST =====
+    if (text === '📋 PROTECTED LIST') {
+        if (!ADMIN_IDS.includes(Number(chatId))) {
+            return bot.sendMessage(chatId, '❌ Admin only!');
+        }
+        const data = await getProtectedWithOwners();
+        let msg = '🛡️ <b>Protected Numbers</b>\n\n';
+        if (data.numbers.length === 0) {
+            msg += 'No numbers protected yet.';
+        } else {
+            for (const num of data.numbers) {
+                const ownerId = data.owners[num] || 'Unknown';
+                const protectedAt = data.protected_at[num] || 'Unknown';
+                msg += `📱 ${num}\n   👤 ${ownerId}\n   🕐 ${protectedAt}\n\n`;
+            }
+        }
+        bot.sendMessage(chatId, msg, { parse_mode: 'HTML' });
+        return;
+    }
+
+    // ===== BUY CREDITS (Button) =====
     if (text === '💳 BUY CREDITS') {
         const keyboard = getPaymentButtons();
         bot.sendMessage(chatId, '💳 <b>Choose a plan:</b>', { 
@@ -1719,26 +1620,13 @@ bot.on('message', async (msg) => {
         return;
     }
 
-    // ===== PROTECT NUMBER (Button) =====
-    if (text === '🛡️ PROTECT NUMBER') {
-        userStates.set(chatId, { state: 'protect_number' });
-        return bot.sendMessage(chatId, 
-            `🛡️ <b>Number Protection</b>\n\n` +
-            `💰 Price: ₹${PROTECTION_PRICE} per number\n` +
-            `📌 Send the 10-digit number you want to protect:\n\n` +
-            `⚠️ Protected numbers cannot be bombed by anyone!\n\n` +
-            `Type /cancel to cancel.`,
-            { parse_mode: 'HTML' }
-        );
-    }
-
     // ===== MY CREDITS =====
     if (text === '💰 MY CREDITS') {
         const isUnlimited = user.daily_unlimited > Date.now() / 1000 || user.lifetime_unlimited === true;
         const unlimitedText = isUnlimited ? '\n⭐ <b>Unlimited Plan Active!</b>' : '';
         const lifetimeText = user.lifetime_unlimited ? '🔮 <b>Lifetime Unlimited Active!</b>' : '';
         bot.sendMessage(chatId, 
-            `💰 <b>Your Credits:</b> <code>${user.credits}</code>${unlimitedText}\n${lifetimeText}\n⚔️ <b>Total Attacks:</b> ${user.total_attacks || 0}\n👥 <b>Total Referrals:</b> ${user.total_referrals || 0}\n\n💡 Each minute costs 1 credit (max 10)\n⭐ 1 Day Unlimited: 50 coins\n🔮 Lifetime Unlimited: 400 coins\n🛡️ Protect Number: ₹${PROTECTION_PRICE}`,
+            `💰 <b>Your Credits:</b> <code>${user.credits}</code>${unlimitedText}\n${lifetimeText}\n⚔️ <b>Total Attacks:</b> ${user.total_attacks || 0}\n👥 <b>Total Referrals:</b> ${user.total_referrals || 0}\n\n💡 Each minute costs 1 credit (max 10)\n⭐ 1 Day Unlimited: 50 coins\n🔮 Lifetime Unlimited: 400 coins`,
             { parse_mode: 'HTML' }
         );
         return;
@@ -1793,7 +1681,7 @@ bot.on('message', async (msg) => {
         const botInfo = await bot.getMe();
         const refData = await getReferralData(chatId);
         const count = refData.count || 0;
-        const msgText = `🔗 <b>Your Referral Code</b>\n\n🎯 <code>${code}</code>\n\n📊 You have referred: ${count} users\n💰 You earned: ${count * 5} credits\n\n<b>How it works:</b>\n• Share your code with friends\n• When they join, only you get 5 credits!\n• <b>Note:</b> Only 1 referral per minute (anti-spam)\n• Invite link: <code>https://t.me/${botInfo.username}?start=${code}</code>`;
+        const msgText = `🔗 <b>Your Referral Code</b>\n\n🎯 <code>${code}</code>\n\n📊 You have referred: ${count} users\n💰 You earned: ${count * 5} credits\n\n<b>How it works:</b>\n• Share your code with friends\n• When they join, only you get 5 credits!\n• <b>Note:</b> Only 1 referral per minute\n• Invite link: <code>https://t.me/${botInfo.username}?start=${code}</code>`;
         bot.sendMessage(chatId, msgText, { parse_mode: 'HTML' });
         return;
     }
@@ -1814,7 +1702,7 @@ bot.on('message', async (msg) => {
     // ===== HELP =====
     if (text === '❓ HELP') {
         bot.sendMessage(chatId, 
-            `🤖 <b>BOT COMMANDS & HELP</b>\n\n📱 <b>START BOMB</b> - Start bombing (choose duration)\n⏹️ <b>STOP BOMB</b> - Stop active bombing\n💰 <b>MY CREDITS</b> - Check your credits\n🎁 <b>DAILY SPIN</b> - Daily spin wheel (1-5 credits)\n🎟️ <b>REDEEM CODE</b> - Redeem code\n🔗 <b>REFERRAL</b> - Get referral link\n💳 <b>BUY CREDITS</b> - Buy credits\n🛡️ <b>PROTECT NUMBER</b> - Protect a number (₹${PROTECTION_PRICE})\n📊 <b>MY STATS</b> - View your stats\n\n💡 <b>Bombing Costs:</b>\n• 1-10 minutes: 1 credit per minute\n• 11-60 minutes: 10 credits\n• ⭐ 1 Day Unlimited: 50 coins\n• 🔮 Lifetime Unlimited: 400 coins\n\n🛡️ <b>Number Protection:</b> ₹${PROTECTION_PRICE} per number\n\n📞 <b>Voice/WA Calls:</b> Always active via API5\n\n💳 <b>Payment:</b>\n• Select plan > Scan QR > Pay > Send screenshot\n• Admin will approve\n\n⭐ <b>Referral Bonus:</b> Only referrer gets 5 credits!`,
+            `🤖 <b>BOT COMMANDS & HELP</b>\n\n📱 <b>START BOMB</b> - Start bombing\n⏹️ <b>STOP BOMB</b> - Stop active bombing\n💰 <b>MY CREDITS</b> - Check your credits\n🎁 <b>DAILY SPIN</b> - Daily spin (1-5 credits)\n🎟️ <b>REDEEM CODE</b> - Redeem code\n🔗 <b>REFERRAL</b> - Get referral link\n💳 <b>BUY CREDITS</b> - Buy credits\n📊 <b>MY STATS</b> - View your stats\n\n💡 <b>Bombing Costs:</b>\n• 1-10 minutes: 1 credit per minute\n• 11-60 minutes: 10 credits\n• ⭐ 1 Day Unlimited: 50 coins\n• 🔮 Lifetime Unlimited: 400 coins\n\n⭐ <b>Referral Bonus:</b> Only referrer gets 5 credits!`,
             { parse_mode: 'HTML' }
         );
         return;
@@ -1848,10 +1736,9 @@ bot.on('message', async (msg) => {
             const privateChannels = await getPrivateChannels();
             const privateLinks = await getPrivateLinks();
             const protectedData = await getProtectedWithOwners();
-            const totalApis = 140;
             const protectedCount = protectedData.numbers ? protectedData.numbers.length : 0;
             bot.sendMessage(chatId, 
-                `📊 <b>BOT STATS</b>\n👥 Users: ${totalUsers}\n💰 Total credits: ${totalCredits}\n⚔️ Attacks: ${totalAttacks}\n📡 APIs loaded: ${totalApis}\n📺 Channels: ${channels.length}\n🔒 Private Channels: ${privateChannels.length}\n🔗 Private Links: ${privateLinks.length}\n🛡️ Protected Numbers: ${protectedCount}\n🌐 Load Balancer: ✅ Active\n🌐 API Instances: 6 (API6: External)`,
+                `📊 <b>BOT STATS</b>\n👥 Users: ${totalUsers}\n💰 Total credits: ${totalCredits}\n⚔️ Attacks: ${totalAttacks}\n📡 APIs loaded: 140+\n📺 Channels: ${channels.length + privateChannels.length + privateLinks.length}\n🛡️ Protected: ${protectedCount}\n🌐 API Instances: 6 (API6: External)`,
                 { parse_mode: 'HTML' }
             );
             return;
@@ -1891,40 +1778,11 @@ bot.on('message', async (msg) => {
             return;
         }
 
-        // ===== ADMIN: ADD PROTECTED (FIXED) =====
-        if (text === '➕ ADD PROTECTED') {
-            userStates.set(chatId, { state: 'admin_add_protected' });
-            bot.sendMessage(chatId, '🛡️ Send 10-digit number to protect (free for admin):');
-            return;
-        }
-
-        if (text === '➖ REMOVE PROTECTED') {
-            userStates.set(chatId, { state: 'remove_protected' });
-            bot.sendMessage(chatId, '❌ Send 10-digit number to unprotect:');
-            return;
-        }
-
-        if (text === '📋 PROTECTED LIST') {
-            const data = await getProtectedWithOwners();
-            let msg = '🛡️ <b>Protected Numbers</b>\n\n';
-            if (data.numbers.length === 0) {
-                msg += 'None';
-            } else {
-                for (const num of data.numbers) {
-                    const ownerId = data.owners[num] || 'Unknown';
-                    const protectedAt = data.protected_at[num] || 'Unknown';
-                    msg += `📱 ${num} (Protected by: ${ownerId})\n   🕐 ${protectedAt}\n\n`;
-                }
-            }
-            bot.sendMessage(chatId, msg, { parse_mode: 'HTML' });
-            return;
-        }
-
         if (text === '📢 BROADCAST') {
             adminBroadcastState.set(chatId, { active: true });
             bot.sendMessage(chatId, 
                 `📢 <b>Broadcast Mode Activated</b>\n\n` +
-                `Send any message (text, photo, video, GIF, etc.) and I'll send it to ALL users without any prefix.\n\n` +
+                `Send any message (text, photo, video, etc.) and I'll send it to ALL users.\n\n` +
                 `Send /cancel to exit.`,
                 { parse_mode: 'HTML' }
             );
@@ -1968,7 +1826,7 @@ bot.on('message', async (msg) => {
 
         if (text === '📺 CHANNEL MANAGER') {
             const keyboard = getChannelManagerButtons();
-            bot.sendMessage(chatId, '📺 <b>Channel Manager</b>\n\nManage public channels, private channels, and private invite links.', { 
+            bot.sendMessage(chatId, '📺 <b>Channel Manager</b>\n\nManage channels and private links.', { 
                 parse_mode: 'HTML',
                 reply_markup: keyboard.reply_markup 
             });
@@ -2043,7 +1901,7 @@ bot.on('message', async (msg) => {
             
             const isProtected = await isNumberProtected(phone);
             if (isProtected) {
-                return bot.sendMessage(chatId, '⚠️ This number is PROTECTED! Bombing not allowed.');
+                return bot.sendMessage(chatId, '⚠️ This number is PROTECTED!\nBombing not allowed!');
             }
             
             userStates.set(chatId, { phone: phone });
@@ -2052,14 +1910,6 @@ bot.on('message', async (msg) => {
                 parse_mode: 'HTML',
                 reply_markup: keyboard.reply_markup
             });
-            return;
-        }
-
-        if (state.state === 'protect_number') {
-            return;
-        }
-
-        if (state.state === 'protection_screenshot') {
             return;
         }
 
@@ -2107,35 +1957,6 @@ bot.on('message', async (msg) => {
             return;
         }
 
-        // ===== ADMIN: ADD PROTECTED (FIXED) =====
-        if (state.state === 'admin_add_protected') {
-            const phone = input.replace(/\D/g, '');
-            if (phone.length !== 10) {
-                return bot.sendMessage(chatId, '❌ Invalid number. Must be 10 digits.');
-            }
-            const isProtected = await isNumberProtected(phone);
-            if (isProtected) {
-                return bot.sendMessage(chatId, `⚠️ ${phone} is already protected.`);
-            }
-            const added = await addProtected(phone, 'admin');
-            if (added) {
-                bot.sendMessage(chatId, `✅ ${phone} added to protected list (admin).`);
-            } else {
-                bot.sendMessage(chatId, `⚠️ Failed to add ${phone}.`);
-            }
-            userStates.delete(chatId);
-            return;
-        }
-
-        if (state.state === 'remove_protected') {
-            const phone = input.replace(/\D/g, '');
-            if (phone.length !== 10) return bot.sendMessage(chatId, '❌ Invalid number. Must be 10 digits.');
-            await removeProtected(phone);
-            bot.sendMessage(chatId, `✅ ${phone} removed from protected list.`);
-            userStates.delete(chatId);
-            return;
-        }
-
         if (state.state === 'unlimited_plan') {
             const uid = parseInt(input);
             if (isNaN(uid)) return bot.sendMessage(chatId, '❌ Invalid ID.');
@@ -2144,7 +1965,7 @@ bot.on('message', async (msg) => {
             await target.save();
             bot.sendMessage(chatId, `✅ 1-Day Unlimited plan granted to user ${uid} for 24 hours!`);
             try {
-                await bot.sendMessage(uid, '⭐ <b>You\'ve been granted a 1-Day Unlimited Bombing Plan!</b>\n\nYou can now bomb any number for free for the next 24 hours!\nUse START BOMB to start bombing.', { parse_mode: 'HTML' });
+                await bot.sendMessage(uid, '⭐ <b>You\'ve been granted a 1-Day Unlimited Bombing Plan!</b>\n\nYou can now bomb any number for free for the next 24 hours!', { parse_mode: 'HTML' });
             } catch (e) {}
             userStates.delete(chatId);
             return;
@@ -2225,19 +2046,9 @@ bot.on('callback_query', async (callbackQuery) => {
         const userId = payment.userId;
         const credits = payment.credits;
         const isLifetime = payment.lifetime || false;
-        const isProtect = payment.protect || false;
         
         try {
-            if (isProtect) {
-                bot.sendMessage(userId, 
-                    `🛡️ <b>You purchased Number Protection!</b>\n\n` +
-                    `💰 Payment of ₹${payment.price} approved!\n\n` +
-                    `Now send the 10-digit number you want to protect.\n` +
-                    `Type /cancel to cancel.`,
-                    { parse_mode: 'HTML' }
-                );
-                userStates.set(userId, { state: 'protect_number' });
-            } else if (isLifetime) {
+            if (isLifetime) {
                 const user = await getUser(userId);
                 user.lifetime_unlimited = true;
                 await user.save();
@@ -2252,27 +2063,23 @@ bot.on('callback_query', async (callbackQuery) => {
             payment.status = 'approved';
             pendingScreenshots.set(payId, payment);
 
-            if (!isProtect) {
-                try {
-                    const msgText = isLifetime ? 
-                        `🎉 <b>Payment Approved!</b>\n\n✅ Your payment of ₹${payment.price} has been approved.\n🔮 <b>Lifetime Unlimited Plan Activated Forever!</b>\n\nUse START BOMB to start bombing!` :
-                        `🎉 <b>Payment Approved!</b>\n\n✅ Your payment of ₹${payment.price} has been approved.\n💰 ${credits > 0 ? `Added ${credits} credits!` : '⭐ Unlimited Plan Activated for 24 hours!'}\n\nUse START BOMB to start bombing!`;
-                    await bot.sendMessage(userId, msgText, { parse_mode: 'HTML' });
-                } catch (e) {}
-            }
+            try {
+                const msgText = isLifetime ? 
+                    `🎉 <b>Payment Approved!</b>\n\n✅ Your payment of ₹${payment.price} has been approved.\n🔮 <b>Lifetime Unlimited Plan Activated Forever!</b>\n\nUse START BOMB to start bombing!` :
+                    `🎉 <b>Payment Approved!</b>\n\n✅ Your payment of ₹${payment.price} has been approved.\n💰 ${credits > 0 ? `Added ${credits} credits!` : '⭐ Unlimited Plan Activated for 24 hours!'}\n\nUse START BOMB to start bombing!`;
+                await bot.sendMessage(userId, msgText, { parse_mode: 'HTML' });
+            } catch (e) {}
 
             await bot.editMessageText(
                 `✅ <b>Payment Approved!</b>\n\n` +
                 `👤 User: ${payment.first_name}\n` +
                 `💳 Plan: ${payment.plan}\n` +
                 `💰 Amount: ₹${payment.price}\n` +
-                `✅ Status: APPROVED${isLifetime ? ' (Lifetime)' : ''}${isProtect ? ' (Protection)' : ''}`,
+                `✅ Status: APPROVED${isLifetime ? ' (Lifetime)' : ''}`,
                 { chat_id: chatId, message_id: msgId, parse_mode: 'HTML' }
             );
 
-            if (!isProtect) {
-                pendingScreenshots.delete(payId);
-            }
+            pendingScreenshots.delete(payId);
 
         } catch (error) {
             bot.editMessageText(`❌ Error: ${error.message}`, { chat_id: chatId, message_id: msgId });
@@ -2320,111 +2127,6 @@ bot.on('callback_query', async (callbackQuery) => {
         return;
     }
 
-    // ===== PROTECTION APPROVAL (FIXED) =====
-    if (data.startsWith('approve_protect_')) {
-        if (!ADMIN_IDS.includes(Number(chatId))) {
-            return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only!', show_alert: true });
-        }
-
-        const payId = data.replace('approve_protect_', '');
-        const protection = pendingProtections.get(payId);
-        
-        if (!protection) {
-            return bot.editMessageText('❌ Protection request not found or already processed.', { chat_id: chatId, message_id: msgId });
-        }
-
-        const userId = protection.userId;
-        const phone = protection.phone;
-        
-        try {
-            // Check if already protected
-            const isProtected = await isNumberProtected(phone);
-            if (isProtected) {
-                await bot.editMessageText(`❌ Number ${phone} is already protected.`, { chat_id: chatId, message_id: msgId });
-                pendingProtections.delete(payId);
-                return bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Already protected!' });
-            }
-            
-            // Add to protected list
-            const added = await addProtected(phone, userId, payId);
-            if (!added) {
-                return bot.editMessageText(`❌ Failed to protect ${phone}.`, { chat_id: chatId, message_id: msgId });
-            }
-            
-            protection.status = 'approved';
-            pendingProtections.set(payId, protection);
-
-            // Notify user
-            try {
-                await bot.sendMessage(userId,
-                    `🛡️ <b>Number Protection Approved!</b>\n\n` +
-                    `✅ Your number <code>${phone}</code> is now PROTECTED!\n` +
-                    `💰 Payment of ₹${PROTECTION_PRICE} approved.\n\n` +
-                    `🔒 This number is now safe from bombing!`,
-                    { parse_mode: 'HTML' }
-                );
-            } catch (e) {}
-
-            // Update admin message
-            await bot.editMessageText(
-                `✅ <b>Protection Approved!</b>\n\n` +
-                `👤 User: ${protection.first_name || protection.userId}\n` +
-                `📱 Number: <code>${phone}</code>\n` +
-                `💰 Amount: ₹${PROTECTION_PRICE}\n` +
-                `🆔 Pay ID: <code>${payId}</code>\n` +
-                `✅ Status: APPROVED`,
-                { chat_id: chatId, message_id: msgId, parse_mode: 'HTML' }
-            );
-
-            // Remove from pending
-            pendingProtections.delete(payId);
-
-        } catch (error) {
-            bot.editMessageText(`❌ Error: ${error.message}`, { chat_id: chatId, message_id: msgId });
-        }
-
-        bot.answerCallbackQuery(callbackQuery.id, { text: '✅ Protection approved!' });
-        return;
-    }
-
-    if (data.startsWith('reject_protect_')) {
-        if (!ADMIN_IDS.includes(Number(chatId))) {
-            return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only!', show_alert: true });
-        }
-
-        const payId = data.replace('reject_protect_', '');
-        const protection = pendingProtections.get(payId);
-
-        if (!protection) {
-            return bot.editMessageText('❌ Protection request not found.', { chat_id: chatId, message_id: msgId });
-        }
-
-        protection.status = 'rejected';
-        pendingProtections.set(payId, protection);
-
-        try {
-            await bot.sendMessage(protection.userId,
-                `❌ <b>Protection Rejected</b>\n\n` +
-                `Your request to protect <code>${protection.phone}</code> was rejected.\n\n` +
-                `Please try again with a clear screenshot.`,
-                { parse_mode: 'HTML' }
-            );
-        } catch (e) {}
-
-        await bot.editMessageText(
-            `❌ <b>Protection Rejected</b>\n\n` +
-            `👤 User: ${protection.first_name || protection.userId}\n` +
-            `📱 Number: <code>${protection.phone}</code>\n` +
-            `💰 Amount: ₹${PROTECTION_PRICE}\n` +
-            `❌ Status: REJECTED`,
-            { chat_id: chatId, message_id: msgId, parse_mode: 'HTML' }
-        );
-
-        pendingProtections.delete(payId);
-        bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Protection rejected' });
-        return;
-    }
-
     // ===== CHANNEL MANAGER =====
     if (data === 'channel_add_public') {
         if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
@@ -2444,7 +2146,7 @@ bot.on('callback_query', async (callbackQuery) => {
 
     if (data === 'channel_add_link') {
         if (!ADMIN_IDS.includes(Number(chatId))) return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only' });
-        await bot.editMessageText('🔗 Send private channel invite link to add (e.g., https://t.me/+XXXX or https://t.me/joinchat/XXXX):', { chat_id: chatId, message_id: msgId });
+        await bot.editMessageText('🔗 Send private channel invite link to add (e.g., https://t.me/+XXXX):', { chat_id: chatId, message_id: msgId });
         userStates.set(chatId, { state: 'add_channel_link' });
         bot.answerCallbackQuery(callbackQuery.id);
         return;
@@ -2558,10 +2260,8 @@ app.get('/health', (req, res) => {
         activeBombing: bombingStatus.size,
         qrCodeSet: qrCodeSet,
         pendingPayments: pendingScreenshots.size,
-        pendingProtections: pendingProtections.size,
         loadBalancer: 'Active',
         apiInstances: Object.keys(API_URLS).length,
-        api5Type: 'Voice & WhatsApp Only',
         api6Type: 'External Fast API'
     });
 });
@@ -2574,21 +2274,10 @@ app.listen(PORT, '0.0.0.0', () => {
 console.log('🤖 ULTIMATE Bot started successfully!');
 console.log(`📡 Load Balancer: FAST MODE ACTIVE`);
 console.log(`🌐 API Instances: 6 (API6: External)`);
-console.log(`🎨 Colorful Main Keyboard: ACTIVE (Bot API 7.4+)`);
-console.log(`⭐ Plans: 1 Day (₹50) | Lifetime (₹400)`);
-console.log(`🛡️ Number Protection: ₹${PROTECTION_PRICE} (Payment via QR)`);
-console.log(`🔗 Private Links: SUPPORTED`);
-console.log(`📊 Per-Second Stats: ACTIVE (Updates every 5s)`);
-console.log(`👥 Referral System: ACTIVE (Only referrer gets credits)`);
+console.log(`🛡️ Protection: Admin-Only (No user payment)`);
+console.log(`📺 Channel Manager: ✅`);
 console.log(`📸 QR Code stored in MongoDB: ${qrCodeSet ? '✅' : '❌'}`);
 console.log(`💳 Screenshot approval system: ✅`);
-console.log(`📢 Broadcast system: ✅ (No prefix)`);
+console.log(`📢 Broadcast system: ✅`);
 console.log(`👑 Admin panel: ✅`);
-console.log(`💬 Direct Message: ✅ (forwardMessage)`);
-console.log(`📦 Data Backup: ✅ (Fixed null checks)`);
-console.log(`⚙️ Settings: REMOVED`);
-console.log(`📝 parse_mode: HTML (Fixed parsing errors)`);
-console.log(`🔒 Lifetime users: 1-Day option hidden on bomb duration`);
-console.log(`🛡️ Protection system: ✅ COMPLETELY FIXED`);
-console.log(`⏱️ Bombing timer: ✅ Fixed for Lifetime users`);
-console.log(`🌐 API6: Active up to 10 minutes (No timeout)`);
+console.log(`🔗 Referral: Only referrer gets 5 credits`);
