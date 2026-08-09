@@ -28,7 +28,7 @@ const API_URLS = {
 const MONGODB_URL = "mongodb+srv://sahajada07:Sahajada123@cluster0.vynn0ht.mongodb.net/?appName=Cluster0";
 const DB_NAME = "otp_bomber";
 
-const PROTECTION_PRICE = 5;
+const PROTECTION_PRICE = 5; // ₹5
 
 // ============================================================
 // ===== MONGODB CONNECTION =====
@@ -68,7 +68,6 @@ const userSchema = new mongoose.Schema({
 
 const User = mongoose.model('User', userSchema);
 
-// ===== PROTECTION SCHEMA =====
 const protectedSchema = new mongoose.Schema({
     numbers: { type: Array, default: [] },
     owners: { type: Object, default: {} },
@@ -1610,16 +1609,6 @@ bot.on('message', async (msg) => {
         return;
     }
 
-    // ===== BUY CREDITS (Button) =====
-    if (text === '💳 BUY CREDITS') {
-        const keyboard = getPaymentButtons();
-        bot.sendMessage(chatId, '💳 <b>Choose a plan:</b>', { 
-            parse_mode: 'HTML', 
-            reply_markup: keyboard.reply_markup 
-        });
-        return;
-    }
-
     // ===== MY CREDITS =====
     if (text === '💰 MY CREDITS') {
         const isUnlimited = user.daily_unlimited > Date.now() / 1000 || user.lifetime_unlimited === true;
@@ -2242,11 +2231,17 @@ bot.on('callback_query', async (callbackQuery) => {
 })();
 
 // ============================================================
-// ===== HEALTH CHECK SERVER =====
+// ===== HEALTH CHECK SERVER (FIXED WITH ROOT ROUTE) =====
 // ============================================================
 
 const app = express();
 
+// ===== ROOT ROUTE – FOR UPTIMEROBOT =====
+app.get('/', (req, res) => {
+    res.send('🤖 OTP Bomber Bot is running!');
+});
+
+// ===== HEALTH CHECK ROUTE =====
 app.get('/health', (req, res) => {
     const mem = process.memoryUsage();
     res.json({
@@ -2262,8 +2257,23 @@ app.get('/health', (req, res) => {
         pendingPayments: pendingScreenshots.size,
         loadBalancer: 'Active',
         apiInstances: Object.keys(API_URLS).length,
-        api6Type: 'External Fast API'
+        api5Type: 'Voice & WhatsApp Only',
+        features: {
+            colorfulMainKeyboard: true,
+            botApiVersion: '7.4+',
+            lifetimeUnlimited: true,
+            referralSystem: true,
+            privateChannels: true,
+            privateLinks: true,
+            numberProtection: true,
+            perSecondStats: true
+        }
     });
+});
+
+// ===== FALLBACK ROUTE – CATCH ALL =====
+app.get('*', (req, res) => {
+    res.status(404).send('❌ Route not found. Use /health for status.');
 });
 
 const PORT = process.env.PORT || 10000;
@@ -2274,10 +2284,23 @@ app.listen(PORT, '0.0.0.0', () => {
 console.log('🤖 ULTIMATE Bot started successfully!');
 console.log(`📡 Load Balancer: FAST MODE ACTIVE`);
 console.log(`🌐 API Instances: 6 (API6: External)`);
-console.log(`🛡️ Protection: Admin-Only (No user payment)`);
-console.log(`📺 Channel Manager: ✅`);
+console.log(`🎨 Colorful Main Keyboard: ACTIVE (Bot API 7.4+)`);
+console.log(`⭐ Plans: 1 Day (₹50) | Lifetime (₹400)`);
+console.log(`🛡️ Number Protection: Admin-Only`);
+console.log(`🔗 Private Links: SUPPORTED`);
+console.log(`📊 Per-Second Stats: ACTIVE (Updates every 5s)`);
+console.log(`👥 Referral System: ACTIVE (Only referrer gets credits)`);
 console.log(`📸 QR Code stored in MongoDB: ${qrCodeSet ? '✅' : '❌'}`);
 console.log(`💳 Screenshot approval system: ✅`);
-console.log(`📢 Broadcast system: ✅`);
+console.log(`📢 Broadcast system: ✅ (No prefix)`);
 console.log(`👑 Admin panel: ✅`);
-console.log(`🔗 Referral: Only referrer gets 5 credits`);
+console.log(`💬 Direct Message: ✅ (forwardMessage)`);
+console.log(`📦 Data Backup: ✅ (Fixed null checks)`);
+console.log(`⚙️ Settings: REMOVED`);
+console.log(`📝 parse_mode: HTML (Fixed parsing errors)`);
+console.log(`🔒 Lifetime users: 1-Day option hidden on bomb duration`);
+console.log(`🛡️ Protection system: ✅ COMPLETELY FIXED`);
+console.log(`⏱️ Bombing timer: ✅ Fixed for Lifetime users`);
+console.log(`🌐 API6: Active up to 10 minutes (No timeout)`);
+console.log(`🌐 Root route: ✅ / - For UptimeRobot`);
+console.log(`🌐 Health route: ✅ /health - For monitoring`);
