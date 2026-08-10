@@ -19,7 +19,7 @@ const ADMIN_IDS = [6346250222];
 
 const API_URLS = {
     api1: 'https://api-server-u2pq.onrender.com',
-    api2: 'https://api-server-fy8w.onrender.com',
+    api2: 'https://api-server-3dci.onrender.com',
     api3: 'https://api-server-mey8.onrender.com',
     api4: 'https://api-server-0abv.onrender.com',
     api5: 'https://wasataap-call-api.onrender.com',
