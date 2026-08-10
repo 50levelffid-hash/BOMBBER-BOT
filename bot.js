@@ -18,7 +18,7 @@ const BOT_TOKEN = "8212356485:AAGeN3peo9uHPG8eCLFRuWjs12hCVC-jNs4";
 const ADMIN_IDS = [6346250222];
 
 const API_URLS = {
-    api1: 'https://api-server-padj.onrender.com',
+    api1: 'https://api-server-u2pq.onrender.com',
     api2: 'https://api-server-fy8w.onrender.com',
     api3: 'https://api-server-mey8.onrender.com',
     api4: 'https://api-server-0abv.onrender.com',
