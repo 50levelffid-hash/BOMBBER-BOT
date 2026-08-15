@@ -22,7 +22,7 @@ const API_URLS = {
     api2: 'https://api-server-i5n0.onrender.com',
     api3: 'https://api-server-a1me.onrender.com',
     api4: 'https://api-server-jo6r.onrender.com',
-    api5: '',
+    api5: 'https://api-server-5c9m.onrender.com',
     api6: 'https://vishal.lovestoblog.com'
 };
 
