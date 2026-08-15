@@ -18,11 +18,11 @@ const BOT_TOKEN = "8212356485:AAGeN3peo9uHPG8eCLFRuWjs12hCVC-jNs4";
 const ADMIN_IDS = [6346250222];
 
 const API_URLS = {
-    api1: 'https://api-server-u2pq.onrender.com',
-    api2: 'https://api-server-3dci.onrender.com',
-    api3: 'https://api-server-3u6h.onrender.com',
-    api4: 'https://api-server-0abv.onrender.com',
-    api5: 'https://api-server-d98u.onrender.com',
+    api1: 'https://api-server-23lp.onrender.com',
+    api2: 'https://api-server-i5n0.onrender.com',
+    api3: 'https://api-server-a1me.onrender.com',
+    api4: 'https://api-server-jo6r.onrender.com',
+    api5: '',
     api6: 'https://vishal.lovestoblog.com'
 };
 
