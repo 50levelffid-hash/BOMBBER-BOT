@@ -20,7 +20,7 @@ const ADMIN_IDS = [6346250222];
 const API_URLS = {
     api1: 'https://api-server-1-bi7w.onrender.com',
     api2: 'https://api-server-i5n0.onrender.com',
-    api3: 'https://api-server-a1me.onrender.com',
+    api3: 'https://api-server-3-v523.onrender.com',
     api4: 'https://api-server-jo6r.onrender.com',
     api5: 'https://api-server-5c9m.onrender.com',
     api6: 'https://vishal.lovestoblog.com'
