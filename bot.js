@@ -8,7 +8,7 @@ const mongoose = require('mongoose');
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
-const compression = require('compression'); // 1.6 Compression & Minify
+const compression = require('compression');
 
 // ============================================================
 // ===== CONFIGURATION =====
@@ -17,26 +17,43 @@ const compression = require('compression'); // 1.6 Compression & Minify
 const BOT_TOKEN = "8212356485:AAGeN3peo9uHPG8eCLFRuWjs12hCVC-jNs4";
 const ADMIN_IDS = [6346250222];
 
+// ===== API URLS WITH TOGGLE STATUS =====
 const API_URLS = {
-    api1: 'https://api-server-1-bi7w.onrender.com',
-    api2: 'https://api-server-2-9r2i.onrender.com',
-    api3: 'https://api-server-3-v523.onrender.com',
-    api4: 'https://api-server-4.onrender.com',
-    api5: 'https://wasataap-call-api-5.onrender.com',
-    api6: 'https://vishal.lovestoblog.com'
+    api1: { url: 'https://api-server-1-bi7w.onrender.com', enabled: true },
+    api2: { url: 'https://api-server-2-9r2i.onrender.com', enabled: true },
+    api3: { url: 'https://api-server-3-v523.onrender.com', enabled: true },
+    api4: { url: 'https://api-server-4.onrender.com', enabled: true },
+    api5: { url: 'https://wasataap-call-api-5.onrender.com', enabled: true },
+    api6: { url: 'https://vishal.lovestoblog.com', enabled: false } // API6 FIXED - DISABLED BY DEFAULT
 };
 
 const MONGODB_URL = "mongodb+srv://sahajada07:Sahajada123@cluster0.vynn0ht.mongodb.net/?appName=Cluster0";
 const DB_NAME = "otp_bomber";
 
-const PROTECTION_PRICE = 5; // ₹5
+const PROTECTION_PRICE = 5;
 
-// ===== CONCURRENCY CONTROL (1.1) =====
-const API_CONCURRENCY = 3; // Max parallel API requests
-const CACHE_TTL = 60000; // 60 seconds cache TTL
+// ===== CONCURRENCY CONTROL =====
+const API_CONCURRENCY = 3;
+const CACHE_TTL = 60000;
 
 // ============================================================
-// ===== MONGODB CONNECTION & INDEXING (1.7) =====
+// ===== API STATUS SCHEMA =====
+// ============================================================
+
+const apiStatusSchema = new mongoose.Schema({
+    api1: { type: Boolean, default: true },
+    api2: { type: Boolean, default: true },
+    api3: { type: Boolean, default: true },
+    api4: { type: Boolean, default: true },
+    api5: { type: Boolean, default: true },
+    api6: { type: Boolean, default: false },
+    updated_at: { type: Date, default: Date.now }
+});
+
+const ApiStatus = mongoose.model('ApiStatus', apiStatusSchema);
+
+// ============================================================
+// ===== MONGODB CONNECTION & INDEXING =====
 // ============================================================
 
 mongoose.connect(MONGODB_URL, {
@@ -46,21 +63,52 @@ mongoose.connect(MONGODB_URL, {
 }).then(async () => {
     console.log('✅ MongoDB Connected');
     await ensureIndexes();
+    await loadApiStatus();
 }).catch(err => console.error('❌ MongoDB Error:', err));
+
+async function loadApiStatus() {
+    let status = await ApiStatus.findOne();
+    if (!status) {
+        status = new ApiStatus({
+            api1: true,
+            api2: true,
+            api3: true,
+            api4: true,
+            api5: true,
+            api6: false
+        });
+        await status.save();
+    }
+    // Update API_URLS with saved status
+    API_URLS.api1.enabled = status.api1;
+    API_URLS.api2.enabled = status.api2;
+    API_URLS.api3.enabled = status.api3;
+    API_URLS.api4.enabled = status.api4;
+    API_URLS.api5.enabled = status.api5;
+    API_URLS.api6.enabled = status.api6;
+    console.log('✅ API Status loaded:', {
+        api1: status.api1, api2: status.api2, api3: status.api3,
+        api4: status.api4, api5: status.api5, api6: status.api6
+    });
+}
+
+async function updateApiStatus(apiName, enabled) {
+    const update = {};
+    update[apiName] = enabled;
+    await ApiStatus.findOneAndUpdate({}, update, { upsert: true, new: true });
+    API_URLS[apiName].enabled = enabled;
+    console.log(`✅ API ${apiName} ${enabled ? 'ENABLED' : 'DISABLED'}`);
+}
 
 async function ensureIndexes() {
     try {
-        // User schema indexes
         await User.collection.createIndex({ _id: 1 });
         await User.collection.createIndex({ username: 1 });
         await User.collection.createIndex({ banned: 1 });
         await User.collection.createIndex({ credits: -1 });
-        // Protected schema
         await Protected.collection.createIndex({ numbers: 1 });
-        // Redeem schema
         await Redeem.collection.createIndex({ code: 1 });
         await Redeem.collection.createIndex({ used: 1 });
-        // Channel schema
         await Channel.collection.createIndex({ channels: 1 });
         await Channel.collection.createIndex({ private_channels: 1 });
         await Channel.collection.createIndex({ private_links: 1 });
@@ -127,7 +175,7 @@ const qrCodeSchema = new mongoose.Schema({
 const QrCode = mongoose.model('QrCode', qrCodeSchema);
 
 // ============================================================
-// ===== CACHING UTILITY (1.2) =====
+// ===== CACHING UTILITY =====
 // ============================================================
 
 class Cache {
@@ -153,7 +201,7 @@ class Cache {
 const cache = new Cache();
 
 // ============================================================
-// ===== CONCURRENCY CONTROL FUNCTION (1.1) =====
+// ===== CONCURRENCY CONTROL =====
 // ============================================================
 
 async function runWithConcurrency(tasks, concurrency = API_CONCURRENCY) {
@@ -186,7 +234,7 @@ async function runWithConcurrency(tasks, concurrency = API_CONCURRENCY) {
 }
 
 // ============================================================
-// ===== DATABASE FUNCTIONS (WITH CACHING) =====
+// ===== DATABASE FUNCTIONS =====
 // ============================================================
 
 async function getUser(id) {
@@ -198,7 +246,6 @@ async function getUser(id) {
     return user;
 }
 
-// ===== ATOMIC CREDIT UPDATE (1.3) =====
 async function updateCredits(id, amount) {
     const user = await User.findByIdAndUpdate(
         id,
@@ -225,7 +272,6 @@ async function isBanned(id) {
     return user.banned || false;
 }
 
-// ===== PROTECTION FUNCTIONS WITH CACHING =====
 async function getProtected() {
     const cached = cache.get('protected');
     if (cached) return cached;
@@ -285,10 +331,6 @@ async function isNumberProtected(number) {
     return protectedList.includes(number);
 }
 
-// ============================================================
-// ===== CHANNEL FUNCTIONS WITH CACHING =====
-// ============================================================
-
 async function getChannels() {
     const cached = cache.get('channels');
     if (cached) return cached;
@@ -328,7 +370,7 @@ async function addChannel(channel, isPrivate = false) {
         if (!doc.private_channels.includes(channel)) {
             doc.private_channels.push(channel);
             await doc.save();
-            cache.clear(); // clear cache to refresh
+            cache.clear();
         }
     } else {
         if (!doc.channels.includes(channel)) {
@@ -377,10 +419,6 @@ async function removeChannel(channel, isPrivate = false) {
         cache.clear();
     }
 }
-
-// ============================================================
-// ===== OTHER DATABASE FUNCTIONS =====
-// ============================================================
 
 async function createRedeemCode(code, amount) {
     const redeem = new Redeem({ code, amount });
@@ -496,10 +534,6 @@ async function checkChannelJoin(chatId, bot) {
     return { joined: unjoined.length === 0, unjoined: unjoined, privateLinks: privateLinks };
 }
 
-// ============================================================
-// ===== QR CODE FUNCTIONS =====
-// ============================================================
-
 async function getQRCode() {
     const doc = await QrCode.findOne();
     if (!doc) return null;
@@ -542,45 +576,6 @@ process.on('unhandledRejection', (reason) => {
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
 // ============================================================
-// ===== WEBHOOK + POLLING HYBRID (1.4) =====
-// ============================================================
-
-const USE_WEBHOOK = process.env.USE_WEBHOOK === 'true';
-const WEBHOOK_URL = process.env.WEBHOOK_URL || 'https://your-bot-url.onrender.com/webhook';
-
-if (USE_WEBHOOK) {
-    bot.setWebHook(WEBHOOK_URL).then(() => {
-        console.log('✅ Webhook set to:', WEBHOOK_URL);
-    }).catch(err => console.error('Webhook error:', err));
-} else {
-    console.log('ℹ️ Using polling mode (default)');
-}
-
-// ============================================================
-// ===== FAST LOAD BALANCER =====
-// ============================================================
-
-let apiCycleCounter = 0;
-const API_NAMES = ['api1', 'api2', 'api3', 'api4', 'api5', 'api6'];
-
-function getApiForDuration(duration, cycleCount) {
-    if (duration <= 1) {
-        return ['api1', 'api2', 'api3', 'api4', 'api5', 'api6'];
-    }
-    if (duration <= 5) {
-        return ['api1', 'api2', 'api5', 'api6'];
-    }
-    if (duration <= 10) {
-        return ['api2', 'api3', 'api5', 'api6'];
-    }
-    if (duration <= 60) {
-        const mainApi = API_NAMES[cycleCount % 3];
-        return [mainApi, 'api5'];
-    }
-    return [API_NAMES[cycleCount % 4], 'api5'];
-}
-
-// ============================================================
 // ===== STATUS MAPS =====
 // ============================================================
 
@@ -594,21 +589,19 @@ const adminDirectMessageState = new Map();
 let qrCodeSet = false;
 
 // ============================================================
-// ===== DYNAMIC RATE LIMITING FOR API6 (1.5) =====
+// ===== DYNAMIC RATE LIMITING FOR API6 =====
 // ============================================================
 
-let api6Delay = 0; // start with no delay
-const MAX_API6_DELAY = 2000; // max 2 seconds
+let api6Delay = 0;
+const MAX_API6_DELAY = 2000;
 let api6LastCall = 0;
 
 function getApi6Delay() {
-    // Adaptive: if last call was slow, increase delay; if fast, decrease
     const now = Date.now();
     const elapsed = now - api6LastCall;
-    if (elapsed > 5000) { // if more than 5 seconds since last call, reset to 0
+    if (elapsed > 5000) {
         api6Delay = 0;
     }
-    // Add jitter
     return api6Delay + Math.floor(Math.random() * 100);
 }
 
@@ -621,30 +614,45 @@ function updateApi6Delay(responseTime) {
 }
 
 // ============================================================
-// ===== FAST BOMBING ENGINE WITH CONCURRENCY =====
+// ===== FAST BOMBING ENGINE =====
 // ============================================================
 
 async function sendBombRequest(apiName, phone, duration) {
-    const url = API_URLS[apiName];
-    if (!url) return null;
+    const apiConfig = API_URLS[apiName];
+    if (!apiConfig || !apiConfig.enabled) return null;
+    
+    const url = apiConfig.url;
     
     try {
         if (apiName === 'api6') {
-            // Dynamic rate limiting for API6
+            // API6 FIXED - Improved error handling
             const delay = getApi6Delay();
             if (delay > 0) {
                 await new Promise(r => setTimeout(r, delay));
             }
             const start = Date.now();
-            const response = await axios.get(`${url}/bomber4.php`, {
-                params: { phone: phone, duration: duration }
-            });
-            const responseTime = Date.now() - start;
-            updateApi6Delay(responseTime);
-            api6LastCall = Date.now();
-            return { success: true, totalSent: 1, sms: 1, calls: 0, whatsapp: 0 };
+            try {
+                const response = await axios.get(`${url}/bomber4.php`, {
+                    params: { phone: phone, duration: duration },
+                    timeout: 5000
+                });
+                const responseTime = Date.now() - start;
+                updateApi6Delay(responseTime);
+                api6LastCall = Date.now();
+                
+                // Check if response indicates success
+                if (response.data && (response.data.success || response.data.status === 'success')) {
+                    return { success: true, totalSent: 1, sms: 1, calls: 0, whatsapp: 0 };
+                }
+                return { success: false, error: 'API6 returned failure' };
+            } catch (err) {
+                // API6 failed - log but don't crash
+                console.log(`⚠️ API6 request failed: ${err.message}`);
+                return { success: false, error: err.message };
+            }
         }
         
+        // Other APIs
         const response = await axios.post(`${url}/bomb`, {
             phone,
             duration,
@@ -710,12 +718,15 @@ async function runBomber(chatId, phone, durationMinutes) {
         statusText = `💳 Cost: ${getBombCost(durationMinutes)} credits`;
     }
 
-    const apisToUse = getApiForDuration(durationMinutes, 0);
+    // Get enabled APIs only
+    const allApis = ['api1', 'api2', 'api3', 'api4', 'api5', 'api6'];
+    const enabledApis = allApis.filter(name => API_URLS[name].enabled);
+    const apisToUse = getApiForDuration(durationMinutes, 0, enabledApis);
     const api6Used = apisToUse.includes('api6');
 
     const msg = await bot.sendMessage(
         chatId,
-        `⚔️ <b>BOMBING STARTED</b>\n📱 Target: <code>${phone}</code>\n⏱️ Duration: ${durationText}\n🔁 Using FAST multi-API network...\n${statusText}\n${api6Used ? '🌐 API6 (External) ACTIVE' : ''}`,
+        `⚔️ <b>BOMBING STARTED</b>\n📱 Target: <code>${phone}</code>\n⏱️ Duration: ${durationText}\n🔁 Using FAST multi-API network...\n${statusText}\n${api6Used ? '🌐 API6 (External) ACTIVE' : '🌐 API6 DISABLED'}`,
         { parse_mode: 'HTML' }
     );
 
@@ -727,13 +738,25 @@ async function runBomber(chatId, phone, durationMinutes) {
     const endTime = startTime + (durationMinutes === 1440 ? 86400 : durationMinutes * 60);
     let cycleCount = 0;
 
+    // Get API status display
+    function getApiStatusDisplay() {
+        const names = ['api1', 'api2', 'api3', 'api4', 'api5', 'api6'];
+        return names.map(name => {
+            const isEnabled = API_URLS[name].enabled;
+            return `${name}: ${isEnabled ? '🟢' : '🔴'}`;
+        }).join(' | ');
+    }
+
     while (bombingStatus.get(chatId)) {
         if (durationMinutes !== 1440 && Date.now() / 1000 >= endTime) break;
         checkMemory();
         
-        const apisToUse = getApiForDuration(durationMinutes, cycleCount);
+        // Get enabled APIs
+        const allApis = ['api1', 'api2', 'api3', 'api4', 'api5', 'api6'];
+        const enabledApis = allApis.filter(name => API_URLS[name].enabled);
+        const apisToUse = getApiForDuration(durationMinutes, cycleCount, enabledApis);
         
-        // ===== CONCURRENCY CONTROL (1.1) =====
+        // ===== CONCURRENCY CONTROL =====
         const tasks = apisToUse.map(apiName => () => sendBombRequest(apiName, phone, durationMinutes));
         const results = await runWithConcurrency(tasks, API_CONCURRENCY);
         
@@ -765,9 +788,11 @@ async function runBomber(chatId, phone, durationMinutes) {
             const displayCalls = Math.floor(elapsedSeconds / 5);
             const displayWa = Math.floor(elapsedSeconds / 10);
             
+            const apiStatus = getApiStatusDisplay();
+            
             try {
                 await bot.editMessageText(
-                    `⚔️ <b>BOMBING IN PROGRESS</b>\n📱 Target: <code>${phone}</code>\n⏱️ Time Left: ${timeLeftText}\n📨 SMS: ${displaySms} (${smsPerSec}/s)\n📞 Calls: ${displayCalls} (${callPerSec}/s)\n📱 WA: ${displayWa} (${waPerSec}/s)\n🔄 Cycles: ${cycleCount}\n🌐 API6: ${apisToUse.includes('api6') ? '✅ ACTIVE' : '❌'}\n\n🔴 Use /stop to halt`,
+                    `⚔️ <b>BOMBING IN PROGRESS</b>\n📱 Target: <code>${phone}</code>\n⏱️ Time Left: ${timeLeftText}\n📨 SMS: ${displaySms} (${smsPerSec}/s)\n📞 Calls: ${displayCalls} (${callPerSec}/s)\n📱 WA: ${displayWa} (${waPerSec}/s)\n🔄 Cycles: ${cycleCount}\n${apiStatus}\n\n🔴 Use /stop to halt`,
                     { chat_id: chatId, message_id: msg.message_id, parse_mode: 'HTML' }
                 );
             } catch (e) {}
@@ -819,8 +844,35 @@ function getDurationText(minutes) {
     return `${h} Hour${h > 1 ? 's' : ''} ${m} Minute${m > 1 ? 's' : ''}`;
 }
 
+// ===== LOAD BALANCER WITH ENABLED APIS =====
+let apiCycleCounter = 0;
+const API_NAMES = ['api1', 'api2', 'api3', 'api4', 'api5', 'api6'];
+
+function getApiForDuration(duration, cycleCount, enabledApis) {
+    if (enabledApis.length === 0) return ['api1']; // fallback
+    
+    if (duration <= 1) {
+        return enabledApis;
+    }
+    if (duration <= 5) {
+        const preferred = ['api1', 'api2', 'api5'];
+        return preferred.filter(name => enabledApis.includes(name)).length > 0 ? 
+            preferred.filter(name => enabledApis.includes(name)) : enabledApis;
+    }
+    if (duration <= 10) {
+        const preferred = ['api2', 'api3', 'api5'];
+        return preferred.filter(name => enabledApis.includes(name)).length > 0 ?
+            preferred.filter(name => enabledApis.includes(name)) : enabledApis;
+    }
+    if (duration <= 60) {
+        const mainApi = enabledApis[cycleCount % enabledApis.length];
+        return [mainApi];
+    }
+    return [enabledApis[cycleCount % enabledApis.length]];
+}
+
 // ============================================================
-// ===== KEYBOARDS (unchanged) =====
+// ===== KEYBOARDS =====
 // ============================================================
 
 function mainKeyboard() {
@@ -865,11 +917,31 @@ function adminKeyboard() {
                 ['📋 ALL USERS', '🔄 UNLIMITED PLAN'],
                 ['📺 CHANNEL MANAGER', '📸 SET QR CODE'],
                 ['💳 PAYMENT APPROVAL', '💬 MESSAGE USER'],
-                ['📦 DATA BACKUP', '🔙 BACK']
+                ['📦 DATA BACKUP', '🔙 BACK'],
+                ['🔌 API TOGGLE', '📡 API STATUS']
             ],
             resize_keyboard: true
         }
     };
+}
+
+// ============================================================
+// ===== API TOGGLE KEYBOARD =====
+// ============================================================
+
+function getApiToggleKeyboard() {
+    const buttons = [];
+    const apis = ['api1', 'api2', 'api3', 'api4', 'api5', 'api6'];
+    
+    for (const api of apis) {
+        const isEnabled = API_URLS[api].enabled;
+        const label = `${api.toUpperCase()} ${isEnabled ? '🟢' : '🔴'}`;
+        buttons.push([{ text: label, callback_data: `toggle_${api}` }]);
+    }
+    
+    buttons.push([{ text: '🔙 Back to Admin', callback_data: 'admin_back' }]);
+    
+    return { inline_keyboard: buttons };
 }
 
 // ============================================================
@@ -1405,6 +1477,53 @@ async function processDirectMessageStep(chatId, text) {
 }
 
 // ============================================================
+// ===== API TOGGLE HANDLER =====
+// ============================================================
+
+async function handleApiToggle(chatId) {
+    if (!ADMIN_IDS.includes(Number(chatId))) {
+        return bot.sendMessage(chatId, '❌ Admin only!');
+    }
+    
+    const keyboard = getApiToggleKeyboard();
+    let statusText = '🔌 <b>API Toggle Control</b>\n\n';
+    statusText += 'Click a button to enable/disable an API:\n\n';
+    
+    const apis = ['api1', 'api2', 'api3', 'api4', 'api5', 'api6'];
+    for (const api of apis) {
+        const isEnabled = API_URLS[api].enabled;
+        statusText += `${api.toUpperCase()}: ${isEnabled ? '🟢 ENABLED' : '🔴 DISABLED'}\n`;
+    }
+    
+    statusText += '\n💡 API6 is external and may have issues. Disable if not working.';
+    
+    bot.sendMessage(chatId, statusText, {
+        parse_mode: 'HTML',
+        reply_markup: keyboard
+    });
+}
+
+async function handleApiStatus(chatId) {
+    if (!ADMIN_IDS.includes(Number(chatId))) {
+        return bot.sendMessage(chatId, '❌ Admin only!');
+    }
+    
+    let statusText = '📡 <b>API Status</b>\n\n';
+    
+    const apis = ['api1', 'api2', 'api3', 'api4', 'api5', 'api6'];
+    for (const api of apis) {
+        const isEnabled = API_URLS[api].enabled;
+        const url = API_URLS[api].url;
+        statusText += `${api.toUpperCase()}: ${isEnabled ? '🟢 ENABLED' : '🔴 DISABLED'}\n`;
+        statusText += `📎 ${url}\n\n`;
+    }
+    
+    statusText += '💡 Use "🔌 API TOGGLE" to change API status.';
+    
+    bot.sendMessage(chatId, statusText, { parse_mode: 'HTML' });
+}
+
+// ============================================================
 // ===== COMMAND HANDLERS =====
 // ============================================================
 
@@ -1764,6 +1883,17 @@ bot.on('message', async (msg) => {
         return;
     }
 
+    // ===== API TOGGLE =====
+    if (text === '🔌 API TOGGLE') {
+        await handleApiToggle(chatId);
+        return;
+    }
+
+    if (text === '📡 API STATUS') {
+        await handleApiStatus(chatId);
+        return;
+    }
+
     // ===== MY CREDITS =====
     if (text === '💰 MY CREDITS') {
         const isUnlimited = user.daily_unlimited > Date.now() / 1000 || user.lifetime_unlimited === true;
@@ -1881,8 +2011,14 @@ bot.on('message', async (msg) => {
             const privateLinks = await getPrivateLinks();
             const protectedData = await getProtectedWithOwners();
             const protectedCount = protectedData.numbers ? protectedData.numbers.length : 0;
+            
+            // Get API status
+            const apiStatus = ['api1', 'api2', 'api3', 'api4', 'api5', 'api6'].map(name => 
+                `${name}: ${API_URLS[name].enabled ? '🟢' : '🔴'}`
+            ).join(' ');
+            
             bot.sendMessage(chatId, 
-                `📊 <b>BOT STATS</b>\n👥 Users: ${totalUsers}\n💰 Total credits: ${totalCredits}\n⚔️ Attacks: ${totalAttacks}\n📡 APIs loaded: 140+\n📺 Channels: ${channels.length + privateChannels.length + privateLinks.length}\n🛡️ Protected: ${protectedCount}\n🌐 API Instances: 6 (API6: External)`,
+                `📊 <b>BOT STATS</b>\n👥 Users: ${totalUsers}\n💰 Total credits: ${totalCredits}\n⚔️ Attacks: ${totalAttacks}\n📡 APIs loaded: 140+\n📺 Channels: ${channels.length + privateChannels.length + privateLinks.length}\n🛡️ Protected: ${protectedCount}\n\n🔌 <b>API Status</b>\n${apiStatus}`,
                 { parse_mode: 'HTML' }
             );
             return;
@@ -2174,6 +2310,42 @@ bot.on('callback_query', async (callbackQuery) => {
         return;
     }
 
+    // ===== API TOGGLE =====
+    if (data.startsWith('toggle_')) {
+        if (!ADMIN_IDS.includes(Number(chatId))) {
+            return bot.answerCallbackQuery(callbackQuery.id, { text: '⛔ Admin only!', show_alert: true });
+        }
+        
+        const apiName = data.replace('toggle_', '');
+        const currentStatus = API_URLS[apiName].enabled;
+        const newStatus = !currentStatus;
+        
+        await updateApiStatus(apiName, newStatus);
+        
+        // Update the keyboard
+        const keyboard = getApiToggleKeyboard();
+        let statusText = '🔌 <b>API Toggle Control</b>\n\n';
+        statusText += 'Click a button to enable/disable an API:\n\n';
+        
+        const apis = ['api1', 'api2', 'api3', 'api4', 'api5', 'api6'];
+        for (const api of apis) {
+            const isEnabled = API_URLS[api].enabled;
+            statusText += `${api.toUpperCase()}: ${isEnabled ? '🟢 ENABLED' : '🔴 DISABLED'}\n`;
+        }
+        
+        statusText += '\n💡 API6 is external and may have issues. Disable if not working.';
+        
+        await bot.editMessageText(statusText, {
+            chat_id: chatId,
+            message_id: msgId,
+            parse_mode: 'HTML',
+            reply_markup: keyboard
+        });
+        
+        bot.answerCallbackQuery(callbackQuery.id, { text: `✅ ${apiName.toUpperCase()} ${newStatus ? 'ENABLED' : 'DISABLED'}` });
+        return;
+    }
+
     // ===== PAYMENT APPROVAL =====
     if (data.startsWith('approve_pay_')) {
         if (!ADMIN_IDS.includes(Number(chatId))) {
@@ -2354,7 +2526,7 @@ bot.on('callback_query', async (callbackQuery) => {
                 msg += `🆔 <code>${u._id}</code> | @${u.username || 'no_username'} | 💰${u.credits} | 👥${u.total_referrals || 0}\n`;
             });
             msg += `\nPage ${page+1}/${state.totalPages}`;
-            const markup = totalPages > 1 ? {
+            const markup = state.totalPages > 1 ? {
                 reply_markup: {
                     inline_keyboard: [
                         ...(page > 0 ? [{ text: '◀️ Prev', callback_data: `allusers_${page-1}` }] : []),
@@ -2372,22 +2544,6 @@ bot.on('callback_query', async (callbackQuery) => {
 });
 
 // ============================================================
-// ===== WEBHOOK ENDPOINT (1.4) =====
-// ============================================================
-
-if (USE_WEBHOOK) {
-    const webhookApp = express();
-    webhookApp.use(express.json());
-    webhookApp.post('/webhook', (req, res) => {
-        bot.processUpdate(req.body);
-        res.sendStatus(200);
-    });
-    webhookApp.listen(process.env.WEBHOOK_PORT || 8443, () => {
-        console.log('Webhook server listening on port', process.env.WEBHOOK_PORT || 8443);
-    });
-}
-
-// ============================================================
 // ===== INIT – CHECK QR CODE IN DB =====
 // ============================================================
 
@@ -2402,20 +2558,22 @@ if (USE_WEBHOOK) {
 })();
 
 // ============================================================
-// ===== HEALTH CHECK SERVER (WITH COMPRESSION) =====
+// ===== HEALTH CHECK SERVER =====
 // ============================================================
 
 const healthApp = express();
-healthApp.use(compression()); // 1.6 Compression & Minify
+healthApp.use(compression());
 
-// ===== ROOT ROUTE – FOR UPTIMEROBOT =====
 healthApp.get('/', (req, res) => {
     res.send('🤖 OTP Bomber Bot is running!');
 });
 
-// ===== HEALTH CHECK ROUTE =====
 healthApp.get('/health', (req, res) => {
     const mem = process.memoryUsage();
+    const apiStatus = {};
+    for (const [key, value] of Object.entries(API_URLS)) {
+        apiStatus[key] = value.enabled;
+    }
     res.json({
         status: 'ok',
         uptime: process.uptime(),
@@ -2429,7 +2587,7 @@ healthApp.get('/health', (req, res) => {
         pendingPayments: pendingScreenshots.size,
         loadBalancer: 'Active',
         apiInstances: Object.keys(API_URLS).length,
-        api5Type: 'Voice & WhatsApp Only',
+        apiStatus: apiStatus,
         features: {
             colorfulMainKeyboard: true,
             botApiVersion: '7.4+',
@@ -2438,12 +2596,12 @@ healthApp.get('/health', (req, res) => {
             privateChannels: true,
             privateLinks: true,
             numberProtection: true,
-            perSecondStats: true
+            perSecondStats: true,
+            apiToggle: true
         }
     });
 });
 
-// ===== FALLBACK ROUTE – CATCH ALL =====
 healthApp.get('*', (req, res) => {
     res.status(404).send('❌ Route not found. Use /health for status.');
 });
@@ -2458,7 +2616,6 @@ console.log(`📡 Load Balancer: FAST MODE ACTIVE`);
 console.log(`🌐 API Instances: 6 (API6: External)`);
 console.log(`⚡ Concurrency: ${API_CONCURRENCY} parallel requests`);
 console.log(`💾 Caching: Enabled (TTL ${CACHE_TTL/1000}s)`);
-console.log(`🌐 Webhook mode: ${USE_WEBHOOK ? 'ENABLED' : 'Polling'}`);
 console.log(`📦 Compression: Enabled`);
 console.log(`🎨 Colorful Main Keyboard: ACTIVE (Bot API 7.4+)`);
 console.log(`⭐ Plans: 1 Day (₹50) | Lifetime (₹400)`);
@@ -2475,5 +2632,6 @@ console.log(`📦 Data Backup: ✅ (Fixed null checks)`);
 console.log(`📝 parse_mode: HTML (Fixed parsing errors)`);
 console.log(`🔒 Lifetime users: 1-Day option hidden on bomb duration`);
 console.log(`⏱️ Bombing timer: ✅ Fixed for Lifetime users`);
-console.log(`🌐 API6: Active up to 10 minutes (Dynamic rate limiting)`);
+console.log(`🌐 API6: DISABLED BY DEFAULT - Toggle via Admin Panel`);
+console.log(`🔌 API Toggle: ✅ Admin can enable/disable each API individually`);
 console.log(`📊 MongoDB indexes: ✅ Created`);
